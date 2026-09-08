@@ -1,0 +1,26 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+@keyframes pichanguero-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+a {
+  color: #4cd964;
+}
+
+a:hover {
+  color: #7ce898;
+}

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <script src="./image-slot.js"></script>
+  <style>
+    html,body{margin:0;padding:0;box-sizing:border-box}
+    *{box-sizing:border-box}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    a{color:#4cd964}
+    a:hover{color:#7ce898}
+  </style>
+</helmet>
+
+<div style="position:relative;width:100vw;height:100vh;overflow:hidden;background:#0a0a0c;font-family:'Manrope',sans-serif;color:#f5f5f5">
+
+  <div style="position:absolute;inset:0;z-index:0">
+    <sc-for list="{{ bgGames }}" as="g" hint-placeholder-count="3">
+      <div style="position:absolute;inset:0;opacity:{{ g.opacity }};pointer-events:{{ g.pointerEvents }};transition:opacity 0.6s ease">
+        <sc-if value="{{ g.isGrid }}" hint-placeholder-val="{{ false }}">
+          <image-slot id="bg-gato" shape="rect" src="./bg-gato.png" placeholder="Fondo: Gato futbolero (jugador/estadio)"></image-slot>
+        </sc-if>
+        <sc-if value="{{ g.isDice }}" hint-placeholder-val="{{ false }}">
+          <image-slot id="bg-tutti" shape="rect" src="./bg-tutti.png" placeholder="Fondo: Tutti frutti futbolero (jugador/estadio)"></image-slot>
+        </sc-if>
+        <sc-if value="{{ g.isHelp }}" hint-placeholder-val="{{ false }}">
+          <image-slot id="bg-adivina" shape="rect" src="./bg-adivina.png" placeholder="Fondo: Adivina el jugador (jugador/estadio)"></image-slot>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+  <div style="position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(105deg, rgba(4,4,5,0.97) 0%, rgba(4,4,5,0.9) 30%, rgba(4,4,5,0.55) 52%, rgba(4,4,5,0.4) 70%, rgba(4,4,5,0.6) 100%), linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0) 22%, rgba(0,0,0,0) 68%, rgba(0,0,0,0.92) 100%)"></div>
+
+  <sc-if value="{{ isMenu }}" hint-placeholder-val="{{ true }}">
+    <div style="position:relative;z-index:2;width:100%;height:100%;display:flex;flex-direction:column">
+
+      <div style="position:absolute;top:32px;left:48px">
+        <img src="./pichanguero-logo.png" alt="Pichanguero" style="height:52px;width:auto;display:block">
+      </div>
+
+      <div style="position:absolute;top:28px;right:48px;width:260px;height:60px;border:1px dashed rgba(255,255,255,0.35);background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.45);font-size:11px;letter-spacing:1.5px;text-transform:uppercase">Espacio publicitario</div>
+
+      <div style="flex-shrink:0;margin-top:clamp(84px,13vh,110px);padding-left:64px;max-width:600px">
+        <sc-if value="{{ selectedGame.flagship }}" hint-placeholder-val="{{ false }}">
+          <div style="display:inline-block;background:#2fae4c;color:#fff;font-size:12px;font-weight:800;letter-spacing:1.5px;padding:5px 12px;margin-bottom:14px;text-transform:uppercase">Juego insignia</div>
+        </sc-if>
+        <h1 style="font-family:'Anton',sans-serif;font-size:58px;line-height:1;margin:0 0 14px 0;text-transform:uppercase;color:#fff;text-shadow:0 2px 18px rgba(0,0,0,0.6)">{{ selectedGame.name }}</h1>
+        <p style="font-size:18px;line-height:1.5;color:#c7c7cc;margin:0;max-width:520px">{{ selectedGame.shortDesc }}</p>
+      </div>
+
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;padding:0 0 22px 0">
+        <div style="border-top:1px solid rgba(255,255,255,0.18);width:100%"></div>
+        <div style="display:flex;align-items:flex-end;gap:22px;width:100%;padding:0 40px 0 40px;box-sizing:border-box">
+
+          <button onClick="{{ prev }}" aria-label="Anterior" style="flex-shrink:0;width:48px;height:48px;margin-bottom:clamp(24px,10vh,60px);border-radius:50%;border:1px solid rgba(255,255,255,0.25);background:rgba(10,10,12,0.55);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:#2fae4c;color:#4cd964">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9.5"></circle><path d="M12 5.5l3.6 2.6-1.4 4.3H9.8L8.4 8.1z" fill="currentColor" stroke="none"></path><path d="M12 5.5V3M12 5.5L8.4 8.1M12 5.5l3.6 2.6M9.8 12.4l-3.3 1M9.8 12.4L7 16M14.2 12.4l3.3 1M14.2 12.4L17 16M9.8 16.5H14.2M9.8 16.5L7 16M14.2 16.5L17 16" stroke-width="0.9"></path></svg>
+          </button>
+
+          <div style="flex-shrink:0;width:clamp(140px,17vw,240px);height:clamp(220px,52vh,380px);border:3px solid #2fae4c;background:rgba(18,18,20,0.6);box-shadow:0 0 32px rgba(47,174,76,0.35);display:flex;align-items:center;justify-content:center">
+            <sc-if value="{{ selectedGame.isGrid }}" hint-placeholder-val="{{ false }}">
+              <svg width="90" height="90" viewBox="0 0 24 24" fill="none" stroke="#4cd964" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+            </sc-if>
+            <sc-if value="{{ selectedGame.isDice }}" hint-placeholder-val="{{ false }}">
+              <svg width="90" height="90" viewBox="0 0 24 24" fill="none" stroke="#4cd964" stroke-width="1.4"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8" cy="8" r="1.4" fill="#4cd964" stroke="none"></circle><circle cx="16" cy="8" r="1.4" fill="#4cd964" stroke="none"></circle><circle cx="8" cy="16" r="1.4" fill="#4cd964" stroke="none"></circle><circle cx="16" cy="16" r="1.4" fill="#4cd964" stroke="none"></circle><circle cx="12" cy="12" r="1.4" fill="#4cd964" stroke="none"></circle></svg>
+            </sc-if>
+            <sc-if value="{{ selectedGame.isHelp }}" hint-placeholder-val="{{ false }}">
+              <svg width="90" height="90" viewBox="0 0 24 24" fill="none" stroke="#4cd964" stroke-width="1.4"><circle cx="12" cy="12" r="9"></circle><text x="12" y="16.5" text-anchor="middle" font-size="10" fill="#4cd964" stroke="none" font-family="Anton, sans-serif">?</text></svg>
+            </sc-if>
+          </div>
+
+          <sc-for list="{{ otherGames }}" as="g" hint-placeholder-count="2">
+            <button onClick="{{ g.onSelect }}" style="flex-shrink:0;width:clamp(70px,7vw,100px);height:clamp(90px,22vh,130px);margin-bottom:clamp(40px,15vh,90px);border:1px solid rgba(255,255,255,0.18);background:rgba(18,18,20,0.4);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:rgba(47,174,76,0.7);background:rgba(20,30,22,0.55)">
+              <sc-if value="{{ g.isGrid }}" hint-placeholder-val="{{ false }}">
+                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#b8b8bc" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+              </sc-if>
+              <sc-if value="{{ g.isDice }}" hint-placeholder-val="{{ false }}">
+                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#b8b8bc" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8" cy="8" r="1.4" fill="#b8b8bc" stroke="none"></circle><circle cx="16" cy="8" r="1.4" fill="#b8b8bc" stroke="none"></circle><circle cx="8" cy="16" r="1.4" fill="#b8b8bc" stroke="none"></circle><circle cx="16" cy="16" r="1.4" fill="#b8b8bc" stroke="none"></circle><circle cx="12" cy="12" r="1.4" fill="#b8b8bc" stroke="none"></circle></svg>
+              </sc-if>
+              <sc-if value="{{ g.isHelp }}" hint-placeholder-val="{{ false }}">
+                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#b8b8bc" stroke-width="1.5"><circle cx="12" cy="12" r="9"></circle><text x="12" y="16.5" text-anchor="middle" font-size="10" fill="#b8b8bc" stroke="none" font-family="Anton, sans-serif">?</text></svg>
+              </sc-if>
+            </button>
+          </sc-for>
+
+          <div style="flex:1"></div>
+
+          <button onClick="{{ next }}" aria-label="Siguiente" style="flex-shrink:0;width:48px;height:48px;margin-bottom:clamp(24px,10vh,60px);border-radius:50%;border:1px solid rgba(255,255,255,0.25);background:rgba(10,10,12,0.55);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="border-color:#2fae4c;color:#4cd964">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="9.5"></circle><path d="M12 5.5l3.6 2.6-1.4 4.3H9.8L8.4 8.1z" fill="currentColor" stroke="none"></path><path d="M12 5.5V3M12 5.5L8.4 8.1M12 5.5l3.6 2.6M9.8 12.4l-3.3 1M9.8 12.4L7 16M14.2 12.4l3.3 1M14.2 12.4L17 16M9.8 16.5H14.2M9.8 16.5L7 16M14.2 16.5L17 16" stroke-width="0.9"></path></svg>
+          </button>
+
+        </div>
+      </div>
+
+      <div style="flex-shrink:0;height:64px;margin:0 40px;border:1px dashed rgba(255,255,255,0.3);background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.4);font-size:12px;letter-spacing:1.5px;text-transform:uppercase">Banner publicitario</div>
+
+      <div style="position:relative;flex-shrink:0;height:84px;background:linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.55));border-top:1px solid rgba(47,174,76,0.4);display:flex;align-items:center;padding:0 40px">
+        <div style="color:#8a8a8e;font-size:13px;letter-spacing:0.5px">Pichanguero · v0.1.0</div>
+        <button onClick="{{ confirm }}" style="position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:10px 26px;border:1px solid rgba(255,255,255,0.25);background:rgba(47,174,76,0.18);cursor:pointer;color:#fff" style-hover="background:rgba(47,174,76,0.32);border-color:#2fae4c">
+          <span style="width:26px;height:26px;border-radius:50%;background:#2fae4c;color:#fff;font-weight:800;font-size:13px;display:flex;align-items:center;justify-content:center">A</span>
+          <span style="font-weight:700;letter-spacing:1px;font-size:15px;text-transform:uppercase">Confirmar</span>
+        </button>
+      </div>
+
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
+    <div style="position:relative;z-index:2;width:100%;height:100%;display:flex;flex-direction:column">
+      <button onClick="{{ backToMenu }}" style="position:absolute;top:36px;left:56px;display:flex;align-items:center;gap:8px;background:none;border:none;color:#c7c7cc;font-size:14px;font-weight:600;letter-spacing:0.5px;cursor:pointer;padding:6px 0" style-hover="color:#4cd964">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg>
+        VOLVER
+      </button>
+
+      <div style="flex:1;display:flex;align-items:center;gap:72px;padding:0 90px">
+        <div style="max-width:560px">
+          <sc-if value="{{ selectedGame.flagship }}" hint-placeholder-val="{{ false }}">
+            <div style="display:inline-block;background:#2fae4c;color:#fff;font-size:12px;font-weight:800;letter-spacing:1.5px;padding:5px 12px;margin-bottom:16px;text-transform:uppercase">Juego insignia</div>
+          </sc-if>
+          <h1 style="font-family:'Anton',sans-serif;font-size:52px;line-height:1;margin:0 0 18px 0;text-transform:uppercase;color:#fff">{{ selectedGame.name }}</h1>
+          <p style="font-size:18px;line-height:1.6;color:#c7c7cc;margin:0 0 30px 0">{{ selectedGame.shortDesc }}</p>
+
+          <div style="border-left:3px solid #2fae4c;padding-left:20px;margin-bottom:36px">
+            <div style="font-size:12px;font-weight:800;letter-spacing:1.5px;color:#4cd964;margin-bottom:8px;text-transform:uppercase">Cómo se juega</div>
+            <p style="font-size:16px;line-height:1.6;color:#e2e2e5;margin:0">{{ selectedGame.howToPlay }}</p>
+          </div>
+
+          <button onClick="{{ startGame }}" style="padding:14px 34px;background:#2fae4c;border:none;color:#fff;font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase;cursor:pointer" style-hover="background:#23913c">Iniciar</button>
+        </div>
+
+        <div style="flex-shrink:0;width:260px;height:320px;border:3px solid rgba(47,174,76,0.6);background:rgba(18,18,20,0.5);box-shadow:0 0 40px rgba(47,174,76,0.3);display:flex;align-items:center;justify-content:center">
+          <sc-if value="{{ selectedGame.isGrid }}" hint-placeholder-val="{{ false }}">
+            <svg width="110" height="110" viewBox="0 0 24 24" fill="none" stroke="#4cd964" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="1"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg>
+          </sc-if>
+          <sc-if value="{{ selectedGame.isDice }}" hint-placeholder-val="{{ false }}">
+            <svg width="110" height="110" viewBox="0 0 24 24" fill="none" stroke="#4cd964" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8" cy="8" r="1.3" fill="#4cd964" stroke="none"></circle><circle cx="16" cy="8" r="1.3" fill="#4cd964" stroke="none"></circle><circle cx="8" cy="16" r="1.3" fill="#4cd964" stroke="none"></circle><circle cx="16" cy="16" r="1.3" fill="#4cd964" stroke="none"></circle><circle cx="12" cy="12" r="1.3" fill="#4cd964" stroke="none"></circle></svg>
+          </sc-if>
+          <sc-if value="{{ selectedGame.isHelp }}" hint-placeholder-val="{{ false }}">
+            <svg width="110" height="110" viewBox="0 0 24 24" fill="none" stroke="#4cd964" stroke-width="1.2"><circle cx="12" cy="12" r="9"></circle><text x="12" y="16.5" text-anchor="middle" font-size="10" fill="#4cd964" stroke="none" font-family="Anton, sans-serif">?</text></svg>
+          </sc-if>
+        </div>
+      </div>
+
+      <div style="position:absolute;bottom:24px;right:40px;color:#6f6f74;font-size:12px;letter-spacing:0.5px">Pichanguero · v0.1.0</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isLoading }}" hint-placeholder-val="{{ false }}">
+    <div style="position:relative;z-index:2;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px">
+      <div style="width:56px;height:56px;border-radius:50%;border:4px solid rgba(255,255,255,0.15);border-top-color:#2fae4c;animation:spin 0.9s linear infinite"></div>
+      <div style="font-family:'Anton',sans-serif;font-size:26px;color:#fff;text-transform:uppercase;letter-spacing:1px">Cargando {{ selectedGame.name }}…</div>
+      <div style="font-size:14px;color:#9a9a9e">(Próximamente)</div>
+      <button onClick="{{ backToMenu }}" style="margin-top:14px;padding:10px 24px;background:none;border:1px solid rgba(255,255,255,0.25);color:#c7c7cc;font-size:13px;font-weight:600;letter-spacing:0.5px;cursor:pointer;text-transform:uppercase" style-hover="border-color:#2fae4c;color:#4cd964">Volver al menú</button>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const GAMES = [
+  {
+    id: 'gato',
+    name: 'Gato futbolero',
+    shortDesc: 'Adivina futbolistas cruzando criterios de fila y columna, al estilo grilla. Compite por turnos con otro jugador online.',
+    howToPlay: 'Cada celda cruza dos criterios (club, selección, época). Escribe un jugador que cumpla ambos. Ganas puntos por cada celda correcta; luego le toca a tu rival.',
+    flagship: true, isGrid: true, isDice: false, isHelp: false
+  },
+  {
+    id: 'tutti',
+    name: 'Tutti frutti futbolero',
+    shortDesc: 'El clásico tutti frutti, pero con categorías de fútbol: clubes, países, jugadores y más.',
+    howToPlay: 'Sale una letra al azar. Completa cada categoría con una palabra que empiece con esa letra antes de que se acabe el tiempo.',
+    flagship: false, isGrid: false, isDice: true, isHelp: false
+  },
+  {
+    id: 'adivina',
+    name: 'Adivina el jugador',
+    shortDesc: 'Un jugador misterioso y pistas que se revelan de a poco. ¿Cuántos intentos necesitas?',
+    howToPlay: 'Cada intento fallido revela una pista nueva (club, país, posición). Adivina el jugador correcto en el menor número de intentos.',
+    flagship: false, isGrid: false, isDice: false, isHelp: true
+  }
+];
+
+class Component extends DCLogic {
+  state = { screen: 'menu', selectedIndex: 0 };
+
+  componentDidMount() {
+    this._onKeyDown = (e) => {
+      const { screen } = this.state;
+      if (screen === 'menu') {
+        if (e.key === 'ArrowRight') { e.preventDefault(); this.next(); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); this.prev(); }
+        else if (e.key === 'Enter') { e.preventDefault(); this.confirm(); }
+      } else if (screen === 'detail') {
+        if (e.key === 'Escape' || e.key === 'Backspace') { this.backToMenu(); }
+        else if (e.key === 'Enter') { this.startGame(); }
+      } else if (screen === 'loading') {
+        if (e.key === 'Escape') { this.backToMenu(); }
+      }
+    };
+    window.addEventListener('keydown', this._onKeyDown);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._onKeyDown);
+  }
+
+  select(i) { this.setState({ selectedIndex: i }); }
+  prev() { this.setState((s) => ({ selectedIndex: (s.selectedIndex - 1 + GAMES.length) % GAMES.length })); }
+  next() { this.setState((s) => ({ selectedIndex: (s.selectedIndex + 1) % GAMES.length })); }
+  confirm() { this.setState({ screen: 'detail' }); }
+  backToMenu() { this.setState({ screen: 'menu' }); }
+  startGame() { this.setState({ screen: 'loading' }); }
+
+  renderVals() {
+    const { screen, selectedIndex } = this.state;
+    const selectedGame = GAMES[selectedIndex];
+    const otherGames = GAMES
+      .map((g, i) => ({ ...g, originalIndex: i, onSelect: () => this.select(i) }))
+      .filter((g) => g.originalIndex !== selectedIndex);
+    const bgGames = GAMES.map((g, i) => ({
+      ...g,
+      opacity: i === selectedIndex ? 1 : 0,
+      pointerEvents: i === selectedIndex ? 'auto' : 'none'
+    }));
+
+    return {
+      isMenu: screen === 'menu',
+      isDetail: screen === 'detail',
+      isLoading: screen === 'loading',
+      selectedGame,
+      otherGames,
+      bgGames,
+      prev: () => this.prev(),
+      next: () => this.next(),
+      confirm: () => this.confirm(),
+      backToMenu: () => this.backToMenu(),
+      startGame: () => this.startGame()
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -64,8 +64,6 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
     }
   }
 
-  const allFilled = categories.every((c) => (draft[c.key] ?? '').trim().length > 0);
-
   async function handleBasta() {
     try {
       // Flush any not-yet-blurred field before cutting the round.
@@ -78,6 +76,21 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
 
   function playerLabel(playerId: string): string {
     return players.find((p) => p.player_id === playerId)?.nickname ?? '—';
+  }
+
+  function resultLabel(row: TuttiAnswerRow | undefined): string {
+    if (!row) return '—';
+    if (row.is_valid) return `✓ +${row.points}`;
+    switch (row.invalid_reason) {
+      case 'empty':
+        return 'Vacío';
+      case 'wrong_letter':
+        return `No empieza con ${session.current_letter}`;
+      case 'not_found':
+        return 'No existe';
+      default:
+        return '✗ 0';
+    }
   }
 
   return (
@@ -148,8 +161,18 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
                             }}
                           />
                           {revealed && (
-                            <div style={{ fontSize: 11, color: myRow?.is_valid ? colors.accentLight : '#e05a5a', marginTop: 3 }}>
-                              {myRow?.is_valid ? `✓ +${myRow.points}` : '✗ 0'}
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: myRow?.is_valid
+                                  ? colors.accentLight
+                                  : myRow?.invalid_reason === 'empty'
+                                    ? colors.textMuted
+                                    : '#e05a5a',
+                                marginTop: 3,
+                              }}
+                            >
+                              {resultLabel(myRow)}
                             </div>
                           )}
                         </td>
@@ -161,13 +184,21 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
                       <td key={c.key} style={bodyCellStyle}>
                         {revealed ? (
                           <>
-                            <span style={{ color: theirRow?.is_valid ? colors.accentLight : '#e05a5a', fontWeight: 700, textTransform: 'uppercase' }}>
+                            <span
+                              style={{
+                                color: theirRow?.is_valid
+                                  ? colors.accentLight
+                                  : theirRow?.invalid_reason === 'empty'
+                                    ? colors.textMuted
+                                    : '#e05a5a',
+                                fontWeight: 700,
+                                textTransform: 'uppercase',
+                              }}
+                            >
                               {theirRow?.answer || '—'}
                             </span>
                             {theirRow && (
-                              <div style={{ fontSize: 11, color: colors.textMuted }}>
-                                {theirRow.is_valid ? `✓ +${theirRow.points}` : '✗ 0'}
-                              </div>
+                              <div style={{ fontSize: 11, color: colors.textMuted }}>{resultLabel(theirRow)}</div>
                             )}
                           </>
                         ) : (
@@ -186,17 +217,16 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
       {session.status === 'round_active' && (
         <button
           onClick={handleBasta}
-          disabled={!allFilled}
           style={{
             padding: '14px 40px',
-            background: allFilled ? colors.accent : 'rgba(47,174,76,0.25)',
+            background: colors.accent,
             border: 'none',
             color: '#fff',
             fontWeight: 800,
             fontSize: 16,
             letterSpacing: 1,
             textTransform: 'uppercase',
-            cursor: allFilled ? 'pointer' : 'default',
+            cursor: 'pointer',
           }}
         >
           ¡Basta!

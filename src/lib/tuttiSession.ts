@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { TUTTI_CATEGORY_POOL, TUTTI_LETTERS, type TuttiCategory } from '../data/tuttiCategories';
-import { validateTuttiAnswer } from './tuttiValidation';
+import { validateTuttiAnswer, type InvalidReason } from './tuttiValidation';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
@@ -45,6 +45,7 @@ export interface TuttiAnswerRow {
   answer: string;
   is_valid: boolean | null;
   points: number | null;
+  invalid_reason: InvalidReason | null;
   created_at: string;
 }
 
@@ -225,12 +226,13 @@ export async function finalizeTuttiRound(session: TuttiSessionRow): Promise<void
 
   for (const category of categories) {
     const categoryAnswers = byCategory.get(category.key) ?? [];
-    const validated: { row: TuttiAnswerRow; groupKey: string; valid: boolean }[] = await Promise.all(
+    const validated: { row: TuttiAnswerRow; groupKey: string; valid: boolean; reason?: InvalidReason }[] = await Promise.all(
       categoryAnswers.map(async (row) => {
         const result = await validateTuttiAnswer(category.rule, letter, row.answer);
         return {
           row,
           valid: result.valid,
+          reason: result.reason,
           groupKey: (result.matchedName ?? row.answer.trim()).toLowerCase(),
         };
       })
@@ -244,7 +246,10 @@ export async function finalizeTuttiRound(session: TuttiSessionRow): Promise<void
 
     for (const v of validated) {
       const points = !v.valid ? 0 : validCountByGroup.get(v.groupKey)! > 1 ? 5 : 10;
-      await supabase.from('tutti_answers').update({ is_valid: v.valid, points }).eq('id', v.row.id);
+      await supabase
+        .from('tutti_answers')
+        .update({ is_valid: v.valid, points, invalid_reason: v.valid ? null : v.reason ?? 'not_found' })
+        .eq('id', v.row.id);
       scoreByPlayer.set(v.row.player_id, (scoreByPlayer.get(v.row.player_id) ?? 0) + points);
     }
   }

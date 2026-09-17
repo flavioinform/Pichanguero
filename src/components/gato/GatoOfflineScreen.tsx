@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { colors, fonts } from '../../theme';
-import { generateGatoGrid, checkGatoAnswer, type GatoGrid, type Difficulty } from '../../lib/gatoGrid';
+import {
+  generateGatoGrid,
+  checkGatoAnswer,
+  isGatoBoardFinished,
+  getClosedGatoCellKeys,
+  type GatoGrid,
+  type Difficulty,
+} from '../../lib/gatoGrid';
 import { pickCpuMove } from '../../lib/gatoBot';
 import { GatoBoard, type BoardTurn } from './GatoBoard';
 import { DifficultySelect } from './DifficultySelect';
@@ -54,7 +61,7 @@ export function GatoOfflineScreen({ onBack }: GatoOfflineScreenProps) {
     setCpuThinking(true);
     let cancelled = false;
 
-    const usedCells = new Set(turns.map((t) => `${t.rowIndex}:${t.colIndex}`));
+    const usedCells = getClosedGatoCellKeys(turns.map((t) => ({ row: t.rowIndex, col: t.colIndex, correct: t.isCorrect })));
 
     const timer = setTimeout(async () => {
       try {
@@ -82,7 +89,9 @@ export function GatoOfflineScreen({ onBack }: GatoOfflineScreenProps) {
   function applyTurn(playerId: string, rowIndex: number, colIndex: number, answer: string, correct: boolean) {
     setTurns((prev) => {
       const next = [...prev, { rowIndex, colIndex, playerId, answer, isCorrect: correct }];
-      if (next.length >= 9) setFinished(true);
+      if (isGatoBoardFinished(next.map((t) => ({ row: t.rowIndex, col: t.colIndex, correct: t.isCorrect })))) {
+        setFinished(true);
+      }
       return next;
     });
     if (correct) setScores((prev) => ({ ...prev, [playerId]: (prev[playerId] ?? 0) + 1 }));
@@ -94,6 +103,12 @@ export function GatoOfflineScreen({ onBack }: GatoOfflineScreenProps) {
     const result = await checkGatoAnswer(answer, grid.rowCriteria[rowIndex], grid.colCriteria[colIndex]);
     applyTurn(ME.id, rowIndex, colIndex, answer, result.correct);
     return result;
+  }
+
+  // The 30s clock ran out on the human's turn — same "bounce" as a wrong
+  // answer: no cell is touched, it's just the CPU's turn now.
+  async function handleTimeout() {
+    setCurrentTurn(CPU.id);
   }
 
   if (!difficulty) {
@@ -128,6 +143,7 @@ export function GatoOfflineScreen({ onBack }: GatoOfflineScreenProps) {
       currentTurnPlayerId={finished ? null : currentTurn}
       finished={finished}
       onSubmitAnswer={handleSubmitAnswer}
+      onTimeout={handleTimeout}
       onExit={onBack}
       onPlayAgain={handlePlayAgain}
       turnLabel={cpuThinking ? 'CPU pensando…' : undefined}

@@ -113,6 +113,7 @@ async function importClubs(validCompetitionIds) {
         ? r.domestic_competition_id
         : null,
       url: r.url || null,
+      coach_name: r.coach_name || null,
     };
   });
   await upsertInBatches('clubs', rows, 'id');

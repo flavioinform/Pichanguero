@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { generateGatoGrid, checkGatoAnswer, type GridCriterion, type Difficulty } from './gatoGrid';
+import { generateGatoGrid, checkGatoAnswer, isGatoBoardFinished, type GridCriterion, type Difficulty } from './gatoGrid';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
@@ -130,12 +130,19 @@ export async function submitGatoTurn(
     ? { ...session.scores, [user.id]: (session.scores[user.id] ?? 0) + 1 }
     : session.scores;
 
-  const { count: turnsPlayed } = await supabase
+  // A wrong answer doesn't close the cell — it "bounces" to the other
+  // player instead, same as a timeout (see passGatoTurn). A cell only
+  // counts as done once it's answered correctly, or has resisted enough
+  // failed attempts to be given up on (see isGatoBoardFinished).
+  const { data: allTurns, error: turnsReadError } = await supabase
     .from('game_turns')
-    .select('*', { count: 'exact', head: true })
+    .select('row_index, col_index, is_correct')
     .eq('session_id', session.id);
+  if (turnsReadError) throw new Error(turnsReadError.message);
 
-  const boardFull = (turnsPlayed ?? 0) >= 9;
+  const boardFull = isGatoBoardFinished(
+    (allTurns ?? []).map((t) => ({ row: t.row_index, col: t.col_index, correct: t.is_correct }))
+  );
 
   const { error: updateError } = await supabase
     .from('game_sessions')
@@ -148,4 +155,18 @@ export async function submitGatoTurn(
   if (updateError) throw new Error(updateError.message);
 
   return { correct: result.correct, matchedPlayerName: result.matchedPlayerName };
+}
+
+/** Turn passed without an attempt — the 30s clock ran out. Same "bounce" as
+ * a wrong answer: no cell closes, it's just the other player's turn now. */
+export async function passGatoTurn(session: GatoSessionRow): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('No hay sesión activa.');
+  if (session.current_turn !== user.id) return;
+
+  const nextTurn = session.player_a === user.id ? session.player_b : session.player_a;
+  const { error } = await supabase.from('game_sessions').update({ current_turn: nextTurn }).eq('id', session.id);
+  if (error) throw new Error(error.message);
 }

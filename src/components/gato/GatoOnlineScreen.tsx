@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { colors, fonts } from '../../theme';
 import { useAuth } from '../../hooks/useAuth';
 import { useGameSession } from '../../hooks/useGameSession';
-import { createGatoSession, joinGatoSession, submitGatoTurn, type GatoSessionRow } from '../../lib/gatoSession';
+import { createGatoSession, joinGatoSession, submitGatoTurn, passGatoTurn, type GatoSessionRow } from '../../lib/gatoSession';
 import type { Difficulty } from '../../lib/gatoGrid';
 import { GatoBoard, type BoardTurn } from './GatoBoard';
 import { DifficultySelect } from './DifficultySelect';
@@ -115,6 +115,7 @@ export function GatoOnlineScreen({ onBack }: GatoOnlineScreenProps) {
         currentTurnPlayerId={session.status === 'finished' ? null : session.current_turn}
         finished={session.status === 'finished'}
         onSubmitAnswer={(row, col, answer) => submitGatoTurn(session, row, col, answer)}
+        onTimeout={() => passGatoTurn(session)}
         onExit={onBack}
         onPlayAgain={handlePlayAgain}
       />

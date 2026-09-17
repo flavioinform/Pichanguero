@@ -14,6 +14,42 @@ export interface GatoGrid {
   colCriteria: [GridCriterion, GridCriterion, GridCriterion];
 }
 
+/** A cell that resists this many total attempts (correct or not, from
+ * either player) closes unclaimed instead of bouncing forever — keeps a
+ * match always finishable even if neither player knows a crossing. Shared
+ * between the board UI (which cells are still selectable) and the
+ * session/offline "is the match over" checks, so they never disagree. */
+export const MAX_ATTEMPTS_PER_CELL = 6;
+
+export interface CellAttempt {
+  row: number;
+  col: number;
+  correct: boolean;
+}
+
+/** Cell keys ("row:col") that are no longer playable — either correctly
+ * answered, or given up on after MAX_ATTEMPTS_PER_CELL failed attempts. */
+export function getClosedGatoCellKeys(attempts: CellAttempt[]): Set<string> {
+  const closed = new Set<string>();
+  const attemptCounts = new Map<string, number>();
+
+  for (const a of attempts) {
+    const key = `${a.row}:${a.col}`;
+    attemptCounts.set(key, (attemptCounts.get(key) ?? 0) + 1);
+    if (a.correct) closed.add(key);
+  }
+  for (const [key, count] of attemptCounts) {
+    if (count >= MAX_ATTEMPTS_PER_CELL) closed.add(key);
+  }
+
+  return closed;
+}
+
+/** True once every one of the 9 cells is closed (see getClosedGatoCellKeys). */
+export function isGatoBoardFinished(attempts: CellAttempt[]): boolean {
+  return getClosedGatoCellKeys(attempts).size >= 9;
+}
+
 function pickRandom<T>(pool: T[], count: number): T[] {
   const shuffled = [...pool].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);

@@ -1,4 +1,4 @@
-export type Screen = 'menu' | 'detail' | 'loading' | 'gato';
+export type Screen = 'menu' | 'detail' | 'loading' | 'gato' | 'tutti';
 
 export interface AppState {
   screen: Screen;

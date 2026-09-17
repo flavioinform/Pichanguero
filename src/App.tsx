@@ -8,6 +8,7 @@ import { MenuScreen } from './components/MenuScreen';
 import { DetailScreen } from './components/DetailScreen';
 import { LoadingScreen } from './components/LoadingScreen';
 import { GatoScreen } from './components/gato/GatoScreen';
+import { TuttiOnlineScreen } from './components/tutti/TuttiOnlineScreen';
 
 const logoUrl = getPublicAssetUrl(LOGO_PATH);
 
@@ -40,7 +41,8 @@ export default function App() {
   const startGame = useCallback(() => {
     setState((s) => {
       const game = games[s.selectedIndex];
-      return { ...s, screen: game?.id === 'gato' ? 'gato' : 'loading' };
+      const screen = game?.id === 'gato' ? 'gato' : game?.id === 'tutti' ? 'tutti' : 'loading';
+      return { ...s, screen };
     });
   }, [games]);
 
@@ -65,7 +67,7 @@ export default function App() {
         } else if (e.key === 'Enter') {
           startGame();
         }
-      } else if (state.screen === 'loading' || state.screen === 'gato') {
+      } else if (state.screen === 'loading' || state.screen === 'gato' || state.screen === 'tutti') {
         if (e.key === 'Escape') {
           backToMenu();
         }
@@ -117,6 +119,8 @@ export default function App() {
       {state.screen === 'loading' && <LoadingScreen gameName={selectedGame.name} onBack={backToMenu} />}
 
       {state.screen === 'gato' && <GatoScreen onBack={backToMenu} />}
+
+      {state.screen === 'tutti' && <TuttiOnlineScreen onBack={backToMenu} />}
     </div>
   );
 }

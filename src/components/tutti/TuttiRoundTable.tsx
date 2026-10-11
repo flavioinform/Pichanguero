@@ -32,13 +32,17 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
   const isHost = session.host_id === userId;
   const voting = session.status === 'round_voting';
 
+  // Scoped to the current round only — tutti_answers keeps one row per
+  // (round, player, category), so without this filter a lookup by category
+  // key alone could resolve to a stale row from an earlier round instead
+  // of the current one (that's what made round 2+ show round 1's answers).
   const myAnswers = useMemo(() => {
     const map: Record<string, TuttiAnswerRow> = {};
     answers.forEach((a) => {
-      if (a.player_id === userId) map[a.category_key] = a;
+      if (a.player_id === userId && a.round === session.current_round) map[a.category_key] = a;
     });
     return map;
-  }, [answers, userId]);
+  }, [answers, userId, session.current_round]);
 
   // Groups this round's answers by category + normalized text, so voters
   // get a "coincide con ..." hint instead of having to eyeball duplicates
@@ -249,7 +253,11 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
                 <tr key={player.id}>
                   <td style={playerCellStyle}>{player.nickname}</td>
                   {categories.map((c) => {
-                    const row = isMe ? myAnswers[c.key] : answers.find((a) => a.player_id === player.player_id && a.category_key === c.key);
+                    const row = isMe
+                      ? myAnswers[c.key]
+                      : answers.find(
+                          (a) => a.player_id === player.player_id && a.category_key === c.key && a.round === session.current_round
+                        );
 
                     if (session.status === 'round_active') {
                       if (isMe) {

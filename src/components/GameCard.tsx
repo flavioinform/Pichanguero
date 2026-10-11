@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GameIcon } from '../icons/GameIcon';
+import { CardArt } from './CardArt';
 import { colors } from '../theme';
 import type { IconKey } from '../types';
 
@@ -12,33 +13,68 @@ interface GameCardProps {
   ariaLabel?: string;
 }
 
-const variantStyles: Record<GameCardVariant, { iconSize: number; iconColor: string; strokeWidth: number }> = {
-  selected: { iconSize: 90, iconColor: colors.accentLight, strokeWidth: 1.4 },
-  lateral: { iconSize: 38, iconColor: colors.iconLateral, strokeWidth: 1.5 },
-  detail: { iconSize: 110, iconColor: colors.accentLight, strokeWidth: 1.2 },
+const variantStyles: Record<GameCardVariant, { iconSize: number; iconColor: string; strokeWidth: number; badge: number }> = {
+  selected: { iconSize: 56, iconColor: '#fff', strokeWidth: 1.4, badge: 84 },
+  lateral: { iconSize: 26, iconColor: '#fff', strokeWidth: 1.5, badge: 44 },
+  detail: { iconSize: 64, iconColor: '#fff', strokeWidth: 1.2, badge: 96 },
 };
+
+function IconBadge({ iconKey, size, iconSize, iconColor, strokeWidth }: {
+  iconKey: IconKey;
+  size: number;
+  iconSize: number;
+  iconColor: string;
+  strokeWidth: number;
+}) {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        zIndex: 1,
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'rgba(10,10,12,0.55)',
+        border: '1px solid rgba(255,255,255,0.25)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <GameIcon iconKey={iconKey} size={iconSize} color={iconColor} strokeWidth={strokeWidth} />
+    </div>
+  );
+}
 
 export function GameCard({ variant, iconKey, onClick, ariaLabel }: GameCardProps) {
   const [hovered, setHovered] = useState(false);
-  const { iconSize, iconColor, strokeWidth } = variantStyles[variant];
+  const { iconSize, iconColor, strokeWidth, badge } = variantStyles[variant];
 
   if (variant === 'selected') {
     return (
-      <div
+      <button
+        onClick={onClick}
+        aria-label={ariaLabel}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         style={{
+          position: 'relative',
           flexShrink: 0,
           width: 'clamp(140px, 17vw, 240px)',
           height: 'clamp(220px, 52vh, 380px)',
           border: `3px solid ${colors.accent}`,
-          background: 'rgba(18,18,20,0.6)',
-          boxShadow: '0 0 32px rgba(47,174,76,0.35)',
+          background: '#0a0a0c',
+          boxShadow: hovered ? '0 0 44px rgba(47,174,76,0.5)' : '0 0 32px rgba(47,174,76,0.35)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
+          cursor: 'pointer',
         }}
       >
-        <GameIcon iconKey={iconKey} size={iconSize} color={iconColor} strokeWidth={strokeWidth} />
-      </div>
+        <CardArt iconKey={iconKey} />
+        <IconBadge iconKey={iconKey} size={badge} iconSize={iconSize} iconColor={iconColor} strokeWidth={strokeWidth} />
+      </button>
     );
   }
 
@@ -46,18 +82,21 @@ export function GameCard({ variant, iconKey, onClick, ariaLabel }: GameCardProps
     return (
       <div
         style={{
+          position: 'relative',
           flexShrink: 0,
           width: 260,
           height: 320,
           border: '3px solid rgba(47,174,76,0.6)',
-          background: 'rgba(18,18,20,0.5)',
+          background: '#0a0a0c',
           boxShadow: '0 0 40px rgba(47,174,76,0.3)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
         }}
       >
-        <GameIcon iconKey={iconKey} size={iconSize} color={iconColor} strokeWidth={strokeWidth} />
+        <CardArt iconKey={iconKey} />
+        <IconBadge iconKey={iconKey} size={badge} iconSize={iconSize} iconColor={iconColor} strokeWidth={strokeWidth} />
       </div>
     );
   }
@@ -69,19 +108,22 @@ export function GameCard({ variant, iconKey, onClick, ariaLabel }: GameCardProps
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        position: 'relative',
         flexShrink: 0,
         width: 'clamp(70px, 7vw, 100px)',
         height: 'clamp(90px, 22vh, 130px)',
         marginBottom: 'clamp(40px, 15vh, 90px)',
         border: `1px solid ${hovered ? 'rgba(47,174,76,0.7)' : 'rgba(255,255,255,0.18)'}`,
-        background: hovered ? 'rgba(20,30,22,0.55)' : 'rgba(18,18,20,0.4)',
+        background: '#0a0a0c',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
         cursor: 'pointer',
       }}
     >
-      <GameIcon iconKey={iconKey} size={iconSize} color={iconColor} strokeWidth={strokeWidth} />
+      <CardArt iconKey={iconKey} />
+      <IconBadge iconKey={iconKey} size={badge} iconSize={iconSize} iconColor={iconColor} strokeWidth={strokeWidth} />
     </button>
   );
 }

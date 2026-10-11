@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { TUTTI_CATEGORY_POOL, TUTTI_LETTERS, type TuttiCategory } from '../data/tuttiCategories';
-import { validateTuttiAnswer, type InvalidReason } from './tuttiValidation';
+import type { InvalidReason } from './tuttiValidation';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
@@ -10,7 +10,7 @@ function generateJoinCode(): string {
   return code;
 }
 
-export type TuttiStatus = 'waiting' | 'round_active' | 'round_grace' | 'round_results' | 'finished';
+export type TuttiStatus = 'waiting' | 'round_active' | 'round_grace' | 'round_voting' | 'round_results' | 'finished';
 
 export interface TuttiSessionRow {
   id: string;
@@ -188,26 +188,86 @@ export async function hitTuttiBasta(session: TuttiSessionRow): Promise<void> {
 }
 
 /**
- * Validates every answer submitted for the round against the real data,
- * scores them (10 = valid and unique among the group, 5 = valid but shared,
- * 0 = invalid or blank), updates each player's total, and closes the round
- * — or the whole match if it was the last one. Safe to call from more than
- * one client at once: the status guard means only the first call through
- * actually does anything.
+ * Opens the voting phase once the grace period after "Basta" runs out:
+ * instead of the system validating answers, the match's own players decide
+ * each one (needed since some categories are subjective and can't be
+ * looked up in a database at all). Blank answers are marked invalid right
+ * away since there's nothing to vote on. Safe to call from more than one
+ * client at once — the status guard means only the first call does anything.
  */
-export async function finalizeTuttiRound(session: TuttiSessionRow): Promise<void> {
+export async function startTuttiVoting(session: TuttiSessionRow): Promise<void> {
   const { data: claimed, error: claimError } = await supabase
     .from('tutti_sessions')
-    .update({ status: 'round_results' })
+    .update({ status: 'round_voting' })
     .eq('id', session.id)
     .eq('status', 'round_grace')
     .select()
     .maybeSingle();
   if (claimError) throw new Error(claimError.message);
-  if (!claimed) return; // another client already finalized this round
+  if (!claimed) return;
 
-  const categories = categoriesForSession(session);
-  const letter = session.current_letter ?? '';
+  const { data: roundAnswers, error: answersError } = await supabase
+    .from('tutti_answers')
+    .select('id, answer')
+    .eq('session_id', session.id)
+    .eq('round', session.current_round);
+  if (answersError) throw new Error(answersError.message);
+
+  const blankIds = (roundAnswers ?? []).filter((a) => !a.answer.trim()).map((a) => a.id);
+  if (blankIds.length > 0) {
+    const { error } = await supabase
+      .from('tutti_answers')
+      .update({ is_valid: false, points: 0, invalid_reason: 'empty' })
+      .in('id', blankIds);
+    if (error) throw new Error(error.message);
+  }
+}
+
+export type TuttiVerdict = 'unique_valid' | 'duplicate_valid' | 'invalid';
+
+const VERDICT_POINTS: Record<TuttiVerdict, number> = {
+  unique_valid: 10,
+  duplicate_valid: 5,
+  invalid: 0,
+};
+
+/** Any player in the match can set (or change) the verdict on any answer —
+ * this *is* the vote: whoever calls it out and clicks confirms it, same as
+ * arguing over the score sheet in the pen-and-paper version of the game. */
+export async function castTuttiVerdict(answerId: string, verdict: TuttiVerdict): Promise<void> {
+  const { error } = await supabase
+    .from('tutti_answers')
+    .update({
+      is_valid: verdict !== 'invalid',
+      points: VERDICT_POINTS[verdict],
+      invalid_reason: verdict === 'invalid' ? 'voted_invalid' : null,
+    })
+    .eq('id', answerId);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Host locks in the round once the group's done voting: any answer nobody
+ * got around to voting on is treated as invalid, sums each player's points
+ * for the round into their total, and closes the round — or the whole
+ * match if it was the last one.
+ */
+export async function finalizeTuttiVoting(session: TuttiSessionRow): Promise<void> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('No hay sesión activa.');
+  if (user.id !== session.host_id) throw new Error('Solo el anfitrión puede cerrar la votación.');
+
+  const { data: claimed, error: claimError } = await supabase
+    .from('tutti_sessions')
+    .update({ status: 'round_results' })
+    .eq('id', session.id)
+    .eq('status', 'round_voting')
+    .select()
+    .maybeSingle();
+  if (claimError) throw new Error(claimError.message);
+  if (!claimed) return;
 
   const { data: answers, error: answersError } = await supabase
     .from('tutti_answers')
@@ -216,42 +276,16 @@ export async function finalizeTuttiRound(session: TuttiSessionRow): Promise<void
     .eq('round', session.current_round);
   if (answersError) throw new Error(answersError.message);
 
-  const byCategory = new Map<string, TuttiAnswerRow[]>();
-  for (const a of answers ?? []) {
-    if (!byCategory.has(a.category_key)) byCategory.set(a.category_key, []);
-    byCategory.get(a.category_key)!.push(a as TuttiAnswerRow);
-  }
-
   const scoreByPlayer = new Map<string, number>();
-
-  for (const category of categories) {
-    const categoryAnswers = byCategory.get(category.key) ?? [];
-    const validated: { row: TuttiAnswerRow; groupKey: string; valid: boolean; reason?: InvalidReason }[] = await Promise.all(
-      categoryAnswers.map(async (row) => {
-        const result = await validateTuttiAnswer(category.rule, letter, row.answer);
-        return {
-          row,
-          valid: result.valid,
-          reason: result.reason,
-          groupKey: (result.matchedName ?? row.answer.trim()).toLowerCase(),
-        };
-      })
-    );
-
-    const validCountByGroup = new Map<string, number>();
-    for (const v of validated) {
-      if (!v.valid) continue;
-      validCountByGroup.set(v.groupKey, (validCountByGroup.get(v.groupKey) ?? 0) + 1);
-    }
-
-    for (const v of validated) {
-      const points = !v.valid ? 0 : validCountByGroup.get(v.groupKey)! > 1 ? 5 : 10;
+  for (const row of (answers ?? []) as TuttiAnswerRow[]) {
+    if (row.is_valid === null) {
       await supabase
         .from('tutti_answers')
-        .update({ is_valid: v.valid, points, invalid_reason: v.valid ? null : v.reason ?? 'not_found' })
-        .eq('id', v.row.id);
-      scoreByPlayer.set(v.row.player_id, (scoreByPlayer.get(v.row.player_id) ?? 0) + points);
+        .update({ is_valid: false, points: 0, invalid_reason: 'voted_invalid' })
+        .eq('id', row.id);
+      continue;
     }
+    scoreByPlayer.set(row.player_id, (scoreByPlayer.get(row.player_id) ?? 0) + (row.points ?? 0));
   }
 
   for (const [playerId, roundScore] of scoreByPlayer) {

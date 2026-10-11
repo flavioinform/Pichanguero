@@ -10,6 +10,10 @@ dist-ssr
 /data/
 archive.zip
 
+# Supabase CLI local state from `supabase link` / `supabase functions serve`.
+/supabase/.temp/
+/supabase/.branches/
+
 # Editor
 .vscode/*
 !.vscode/extensions.json

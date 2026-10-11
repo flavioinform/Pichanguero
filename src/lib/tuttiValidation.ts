@@ -22,7 +22,7 @@ function escapeIlike(text: string): string {
   return text.replace(/[%_]/g, (m) => `\\${m}`);
 }
 
-export type InvalidReason = 'empty' | 'wrong_letter' | 'not_found';
+export type InvalidReason = 'empty' | 'wrong_letter' | 'not_found' | 'voted_invalid';
 
 export interface TuttiValidation {
   valid: boolean;

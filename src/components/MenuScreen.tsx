@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import type { Game } from '../types';
 import { colors, fonts } from '../theme';
 import { AdSlot } from './AdSlot';
 import { GameCard } from './GameCard';
 import { NavArrow } from './NavArrow';
 import { FlagshipBadge } from './FlagshipBadge';
+import { LiveMatchesWidget } from './LiveMatchesWidget';
 
 interface MenuScreenProps {
   games: Game[];
@@ -18,7 +18,11 @@ interface MenuScreenProps {
 
 export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, onNext, onConfirm }: MenuScreenProps) {
   const selectedGame = games[selectedIndex];
-  const [confirmHovered, setConfirmHovered] = useState(false);
+
+  function selectAndEnter(index: number) {
+    onSelect(index);
+    onConfirm();
+  }
 
   return (
     <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -30,6 +34,8 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
         label="Espacio publicitario"
         style={{ position: 'absolute', top: 28, right: 48, width: 260, height: 60 }}
       />
+
+      <LiveMatchesWidget />
 
       <div style={{ flexShrink: 0, marginTop: 'clamp(84px, 13vh, 110px)', paddingLeft: 64, maxWidth: 600 }}>
         {selectedGame.isFlagship && <FlagshipBadge style={{ marginBottom: 14 }} />}
@@ -56,7 +62,12 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 22, width: '100%', padding: '0 40px', boxSizing: 'border-box' }}>
           <NavArrow direction="prev" onClick={onPrev} />
 
-          <GameCard variant="selected" iconKey={selectedGame.iconKey} />
+          <GameCard
+            variant="selected"
+            iconKey={selectedGame.iconKey}
+            ariaLabel={`Entrar a ${selectedGame.name}`}
+            onClick={onConfirm}
+          />
 
           {games.map((game, i) =>
             i === selectedIndex ? null : (
@@ -64,8 +75,8 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
                 key={game.id}
                 variant="lateral"
                 iconKey={game.iconKey}
-                ariaLabel={game.name}
-                onClick={() => onSelect(i)}
+                ariaLabel={`Entrar a ${game.name}`}
+                onClick={() => selectAndEnter(i)}
               />
             )
           )}
@@ -98,42 +109,6 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
         }}
       >
         <div style={{ color: colors.textFooter, fontSize: 13, letterSpacing: 0.5 }}>Pichanguero · v0.1.0</div>
-        <button
-          onClick={onConfirm}
-          onMouseEnter={() => setConfirmHovered(true)}
-          onMouseLeave={() => setConfirmHovered(false)}
-          style={{
-            position: 'absolute',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '10px 26px',
-            border: `1px solid ${confirmHovered ? colors.accent : 'rgba(255,255,255,0.25)'}`,
-            background: confirmHovered ? 'rgba(47,174,76,0.32)' : 'rgba(47,174,76,0.18)',
-            cursor: 'pointer',
-            color: '#fff',
-          }}
-        >
-          <span
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: '50%',
-              background: colors.accent,
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 13,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            A
-          </span>
-          <span style={{ fontWeight: 700, letterSpacing: 1, fontSize: 15, textTransform: 'uppercase' }}>Confirmar</span>
-        </button>
       </div>
     </div>
   );

@@ -1,0 +1,293 @@
+<title>Pichanguero Card Art</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --panel: #101012;
+    --border: rgba(255,255,255,0.12);
+    --text: #f5f5f5;
+    --text-secondary: #9a9a9e;
+    --accent: #2fae4c;
+    --accent-light: #4cd964;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Manrope', system-ui, sans-serif;
+    padding: 48px 32px;
+  }
+  h1 {
+    font-family: 'Anton', sans-serif;
+    text-transform: uppercase;
+    font-size: clamp(28px, 4vw, 40px);
+    margin: 0 0 8px;
+    letter-spacing: 0.5px;
+  }
+  p.sub { color: var(--text-secondary); margin: 0 0 40px; font-size: 15px; max-width: 620px; }
+
+  section { margin-bottom: 56px; }
+  h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent-light);
+    margin: 0 0 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .row { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-end; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .label { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; }
+
+  .card {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .card svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  .card--selected { width: 200px; height: 320px; border: 3px solid var(--accent); box-shadow: 0 0 32px rgba(47,174,76,0.35); }
+  .card--lateral { width: 90px; height: 118px; border: 1px solid rgba(255,255,255,0.18); }
+  .card--detail { width: 220px; height: 270px; border: 3px solid rgba(47,174,76,0.6); box-shadow: 0 0 40px rgba(47,174,76,0.3); }
+
+  .badge {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: rgba(10,10,12,0.55);
+    border: 1px solid rgba(255,255,255,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+  }
+</style>
+
+<h1>Ilustraciones de tarjeta</h1>
+<p class="sub">
+  Una por juego, pensadas para reemplazar el fondo genérico. Mismo lenguaje visual que los íconos
+  existentes (línea verde, hand-drawn) pero llenando toda la tarjeta. Se muestran a los 3 tamaños
+  reales que usa la app: tarjeta destacada, lateral chica, y la de la pantalla de detalle.
+</p>
+
+<!-- Shared gradient defs, referenced by id from every inline SVG below -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <radialGradient id="glowGato" cx="50%" cy="42%" r="55%">
+      <stop offset="0%" stop-color="#173a20"/>
+      <stop offset="100%" stop-color="#0a0a0c"/>
+    </radialGradient>
+    <radialGradient id="glowTutti" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#173a20"/>
+      <stop offset="100%" stop-color="#0a0a0c"/>
+    </radialGradient>
+    <radialGradient id="glowAdivina" cx="50%" cy="38%" r="45%">
+      <stop offset="0%" stop-color="#1d1d1f"/>
+      <stop offset="100%" stop-color="#0a0a0c"/>
+    </radialGradient>
+    <linearGradient id="fadeBottom" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a0c" stop-opacity="0"/>
+      <stop offset="68%" stop-color="#0a0a0c" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#0a0a0c" stop-opacity="0.92"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<section>
+  <h2>Gato futbolero</h2>
+  <div class="row">
+    <div class="col">
+      <div class="card card--selected">
+        <svg viewBox="0 0 200 320"><use href="#gatoArt"/></svg>
+        <div class="badge" style="width:74px;height:74px">
+          <svg width="48" height="48" viewBox="-26 -26 52 52" fill="none" stroke="#fff" stroke-width="1.4">
+            <circle r="13"/>
+            <path d="M0 -6.5l4.3 3.1-1.65 5.05h-5.3l-1.65-5.05z" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Destacada 200×320</div>
+    </div>
+    <div class="col">
+      <div class="card card--lateral">
+        <svg viewBox="0 0 200 320"><use href="#gatoArt"/></svg>
+        <div class="badge" style="width:40px;height:40px">
+          <svg width="22" height="22" viewBox="-26 -26 52 52" fill="none" stroke="#fff" stroke-width="1.4">
+            <circle r="13"/>
+            <path d="M0 -6.5l4.3 3.1-1.65 5.05h-5.3l-1.65-5.05z" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Lateral 90×118</div>
+    </div>
+    <div class="col">
+      <div class="card card--detail">
+        <svg viewBox="0 0 200 320"><use href="#gatoArt"/></svg>
+        <div class="badge" style="width:88px;height:88px">
+          <svg width="56" height="56" viewBox="-26 -26 52 52" fill="none" stroke="#fff" stroke-width="1.4">
+            <circle r="13"/>
+            <path d="M0 -6.5l4.3 3.1-1.65 5.05h-5.3l-1.65-5.05z" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Detalle 220×270</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Tutti frutti futbolero</h2>
+  <div class="row">
+    <div class="col">
+      <div class="card card--selected">
+        <svg viewBox="0 0 200 320"><use href="#tuttiArt"/></svg>
+        <div class="badge" style="width:74px;height:74px">
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.4">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8" cy="8" r="1.4" fill="#fff" stroke="none"/>
+            <circle cx="16" cy="8" r="1.4" fill="#fff" stroke="none"/>
+            <circle cx="8" cy="16" r="1.4" fill="#fff" stroke="none"/>
+            <circle cx="16" cy="16" r="1.4" fill="#fff" stroke="none"/>
+            <circle cx="12" cy="12" r="1.4" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Destacada</div>
+    </div>
+    <div class="col">
+      <div class="card card--lateral">
+        <svg viewBox="0 0 200 320"><use href="#tuttiArt"/></svg>
+        <div class="badge" style="width:40px;height:40px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8" cy="8" r="1.4" fill="#fff" stroke="none"/>
+            <circle cx="16" cy="16" r="1.4" fill="#fff" stroke="none"/>
+            <circle cx="12" cy="12" r="1.4" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Lateral</div>
+    </div>
+    <div class="col">
+      <div class="card card--detail">
+        <svg viewBox="0 0 200 320"><use href="#tuttiArt"/></svg>
+        <div class="badge" style="width:88px;height:88px">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="8" cy="8" r="1.3" fill="#fff" stroke="none"/>
+            <circle cx="16" cy="8" r="1.3" fill="#fff" stroke="none"/>
+            <circle cx="8" cy="16" r="1.3" fill="#fff" stroke="none"/>
+            <circle cx="16" cy="16" r="1.3" fill="#fff" stroke="none"/>
+            <circle cx="12" cy="12" r="1.3" fill="#fff" stroke="none"/>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Detalle</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Adivina el jugador</h2>
+  <div class="row">
+    <div class="col">
+      <div class="card card--selected">
+        <svg viewBox="0 0 200 320"><use href="#adivinaArt"/></svg>
+        <div class="badge" style="width:74px;height:74px">
+          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.4">
+            <circle cx="12" cy="12" r="9"/>
+            <text x="12" y="16.5" text-anchor="middle" font-size="10" fill="#fff" stroke="none" font-family="Anton, sans-serif">?</text>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Destacada</div>
+    </div>
+    <div class="col">
+      <div class="card card--lateral">
+        <svg viewBox="0 0 200 320"><use href="#adivinaArt"/></svg>
+        <div class="badge" style="width:40px;height:40px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.5">
+            <circle cx="12" cy="12" r="9"/>
+            <text x="12" y="16.5" text-anchor="middle" font-size="10" fill="#fff" stroke="none" font-family="Anton, sans-serif">?</text>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Lateral</div>
+    </div>
+    <div class="col">
+      <div class="card card--detail">
+        <svg viewBox="0 0 200 320"><use href="#adivinaArt"/></svg>
+        <div class="badge" style="width:88px;height:88px">
+          <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.2">
+            <circle cx="12" cy="12" r="9"/>
+            <text x="12" y="16.5" text-anchor="middle" font-size="10" fill="#fff" stroke="none" font-family="Anton, sans-serif">?</text>
+          </svg>
+        </div>
+      </div>
+      <div class="label">Detalle</div>
+    </div>
+  </div>
+</section>
+
+<!-- Actual artwork definitions, reused via <use> above -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="gatoArt">
+      <rect width="200" height="320" fill="url(#glowGato)"/>
+      <g stroke="#2fae4c" stroke-width="2.6" opacity="0.9">
+        <rect x="42" y="60" width="116" height="166" fill="none"/>
+        <line x1="80" y1="60" x2="80" y2="226"/>
+        <line x1="120" y1="60" x2="120" y2="226"/>
+        <line x1="42" y1="115" x2="158" y2="115"/>
+        <line x1="42" y1="170" x2="158" y2="170"/>
+      </g>
+      <g transform="translate(100,142)">
+        <circle r="22" fill="#0a0a0c" stroke="#4cd964" stroke-width="2"/>
+        <path d="M0 -11l7.3 5.3-2.8 8.6H-4.5l-2.8-8.6z" fill="#4cd964"/>
+      </g>
+      <path d="M56 152l8 10 20-24" stroke="#4cd964" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.85"/>
+      <g stroke="#8a8a8e" stroke-width="2.6" stroke-linecap="round" opacity="0.5">
+        <line x1="133" y1="182" x2="149" y2="200"/>
+        <line x1="149" y1="182" x2="133" y2="200"/>
+      </g>
+      <rect width="200" height="320" fill="url(#fadeBottom)"/>
+    </g>
+
+    <g id="tuttiArt">
+      <rect width="200" height="320" fill="url(#glowTutti)"/>
+      <g transform="translate(72,128) rotate(-12)">
+        <rect x="-38" y="-38" width="76" height="76" rx="9" fill="#0a0a0c" stroke="#2fae4c" stroke-width="2.6"/>
+        <g fill="#4cd964">
+          <circle cx="-19" cy="-19" r="4"/>
+          <circle cx="19" cy="-19" r="4"/>
+          <circle cx="-19" cy="19" r="4"/>
+          <circle cx="19" cy="19" r="4"/>
+          <circle cx="0" cy="0" r="4"/>
+        </g>
+      </g>
+      <g transform="translate(128,200) rotate(10)">
+        <rect x="-35" y="-35" width="70" height="70" rx="9" fill="#0a0a0c" stroke="#4cd964" stroke-width="2.6"/>
+        <text x="0" y="15" text-anchor="middle" font-family="'Anton', sans-serif" font-size="44" fill="#4cd964">F</text>
+      </g>
+      <rect width="200" height="320" fill="url(#fadeBottom)"/>
+    </g>
+
+    <g id="adivinaArt">
+      <rect width="200" height="320" fill="url(#glowAdivina)"/>
+      <g fill="#16211a" stroke="#2fae4c" stroke-width="2.2">
+        <circle cx="100" cy="112" r="28"/>
+        <path d="M52 218c0-38 23-61 48-61s48 23 48 61v17H52z"/>
+      </g>
+      <g stroke="#2fae4c" stroke-width="1.6" opacity="0.5">
+        <line x1="76" y1="195" x2="124" y2="195"/>
+        <line x1="80" y1="207" x2="120" y2="207"/>
+      </g>
+      <text x="100" y="140" text-anchor="middle" font-family="'Anton', sans-serif" font-size="72" fill="#4cd964">?</text>
+      <rect width="200" height="320" fill="url(#fadeBottom)"/>
+    </g>
+  </defs>
+</svg>

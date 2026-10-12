@@ -1,15 +1,6 @@
 import { supabase } from './supabaseClient';
+import { generateJoinCode } from './joinCode';
 import { generateGatoGrid, checkGatoAnswer, isGatoBoardFinished, type GridCriterion, type Difficulty } from './gatoGrid';
-
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
-
-function generateJoinCode(): string {
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
-  }
-  return code;
-}
 
 export interface GatoSessionRow {
   id: string;

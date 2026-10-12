@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, GRID_LINE } from '../../theme';
 import type { TuttiSessionRow, TuttiPlayerRow, TuttiAnswerRow, TuttiVerdict } from '../../lib/tuttiSession';
 import {
   categoriesForSession,
@@ -11,8 +11,7 @@ import {
   finalizeTuttiVoting,
 } from '../../lib/tuttiSession';
 import { validateTuttiAnswer, type TuttiValidation } from '../../lib/tuttiValidation';
-
-const GRACE_SECONDS = 6;
+import { TUTTI } from '../../config/gameConfig';
 
 interface TuttiRoundTableProps {
   session: TuttiSessionRow;
@@ -25,7 +24,7 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
   const categories = useMemo(() => categoriesForSession(session), [session]);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [graceLeft, setGraceLeft] = useState(GRACE_SECONDS);
+  const [graceLeft, setGraceLeft] = useState(TUTTI.graceSeconds);
   const [hints, setHints] = useState<Record<string, TuttiValidation>>({});
   const hintsRoundRef = useRef<number | null>(null);
 
@@ -72,7 +71,7 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
     const bastaAt = new Date(session.basta_at).getTime();
 
     const interval = setInterval(() => {
-      const left = Math.max(0, GRACE_SECONDS - Math.floor((Date.now() - bastaAt) / 1000));
+      const left = Math.max(0, TUTTI.graceSeconds - Math.floor((Date.now() - bastaAt) / 1000));
       setGraceLeft(left);
       if (left === 0) {
         clearInterval(interval);
@@ -120,7 +119,7 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
   }
 
   async function handleAnswerBlur(categoryKey: string) {
-    if (session.status !== 'round_active') return;
+    if (session.status !== 'round_active' && session.status !== 'round_grace') return;
     try {
       await submitTuttiAnswer(session, categoryKey, draft[categoryKey] ?? '');
     } catch (err) {
@@ -181,6 +180,19 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
     return row.points === 5 ? 'duplicate_valid' : 'unique_valid';
   }
 
+  // Round points per player, summed from the verdicts so far — shown live
+  // while voting and final once the round is scored.
+  const roundPoints = useMemo(() => {
+    const sums: Record<string, number> = {};
+    for (const a of answers) {
+      if (a.round !== session.current_round || a.is_valid === null) continue;
+      sums[a.player_id] = (sums[a.player_id] ?? 0) + (a.points ?? 0);
+    }
+    return sums;
+  }, [answers, session.current_round]);
+
+  const pointsPending = session.status === 'round_active' || session.status === 'round_grace';
+
   // How many categories each player has at least typed something into for
   // this round — a live "who's still working" readout while the round is
   // active, since the table itself hides everyone else's answers until it
@@ -212,12 +224,12 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
         </div>
       )}
       {session.status === 'round_grace' && (
-        <div style={{ fontSize: 14, color: '#e0c15a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <div style={{ fontSize: 14, color: colors.warning, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           ¡Basta de {playerLabel(session.basta_player_id ?? '')}! Se corta en {graceLeft}s
         </div>
       )}
       {voting && (
-        <div style={{ fontSize: 14, color: '#e0c15a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <div style={{ fontSize: 14, color: colors.warning, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           Voten cada respuesta — único = 10, repetida = 5, inválida = 0
         </div>
       )}
@@ -244,6 +256,8 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
                   {c.label}
                 </th>
               ))}
+              <th style={{ ...headCellStyle, width: 90 }}>Ronda</th>
+              <th style={{ ...headCellStyle, width: 90 }}>Total</th>
             </tr>
           </thead>
           <tbody>
@@ -259,7 +273,7 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
                           (a) => a.player_id === player.player_id && a.category_key === c.key && a.round === session.current_round
                         );
 
-                    if (session.status === 'round_active') {
+                    if (session.status === 'round_active' || session.status === 'round_grace') {
                       if (isMe) {
                         return (
                           <td key={c.key} style={bodyCellStyle}>
@@ -302,9 +316,13 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
                             </div>
                           )}
                           {others.length > 0 && (
-                            <div style={{ fontSize: 10, color: '#e0c15a', marginTop: 2 }}>coincide con {others.join(', ')}</div>
+                            <div style={{ fontSize: 10, color: colors.warning, marginTop: 2 }}>coincide con {others.join(', ')}</div>
                           )}
-                          <VerdictButtons active={active} onPick={(v) => handleVerdict(row.id, v)} />
+                          {isMe ? (
+                            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6 }}>Lo votan los demás</div>
+                          ) : (
+                            <VerdictButtons active={active} onPick={(v) => handleVerdict(row.id, v)} />
+                          )}
                         </td>
                       );
                     }
@@ -314,7 +332,7 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
                       <td key={c.key} style={bodyCellStyle}>
                         <span
                           style={{
-                            color: row?.is_valid ? colors.accentLight : row?.invalid_reason === 'empty' ? colors.textMuted : '#e05a5a',
+                            color: row?.is_valid ? colors.accentLight : row?.invalid_reason === 'empty' ? colors.textMuted : colors.danger,
                             fontWeight: 700,
                             textTransform: 'uppercase',
                           }}
@@ -325,6 +343,12 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
                       </td>
                     );
                   })}
+                  <td style={{ ...bodyCellStyle, fontFamily: fonts.display, fontSize: 20, color: colors.textSecondary }}>
+                    {pointsPending ? '—' : roundPoints[player.player_id] ?? 0}
+                  </td>
+                  <td style={{ ...bodyCellStyle, fontFamily: fonts.display, fontSize: 20, color: colors.accentLight }}>
+                    {player.total_score}
+                  </td>
                 </tr>
               );
             })}
@@ -349,7 +373,7 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
         </div>
       )}
 
-      {errorMsg && <div style={{ color: '#e05a5a', fontSize: 13 }}>{errorMsg}</div>}
+      {errorMsg && <div style={{ color: colors.danger, fontSize: 13 }}>{errorMsg}</div>}
     </div>
   );
 }
@@ -384,7 +408,6 @@ function VerdictButtons({ active, onPick }: { active: TuttiVerdict | null; onPic
   );
 }
 
-const GRID_LINE = '1px solid rgba(255,255,255,0.15)';
 
 const cornerCellStyle: CSSProperties = {
   padding: '10px 14px',

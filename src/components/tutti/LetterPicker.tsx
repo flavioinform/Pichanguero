@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { colors, fonts } from '../../theme';
 import { TUTTI_LETTERS } from '../../data/tuttiCategories';
+import { TUTTI } from '../../config/gameConfig';
 
 interface LetterPickerProps {
   onPick: (letter: string) => void;
   disabled?: boolean;
 }
-
-const SPIN_DURATION_MS = 1200;
-const SPIN_TICK_MS = 60;
 
 export function LetterPicker({ onPick, disabled }: LetterPickerProps) {
   const [manualOpen, setManualOpen] = useState(false);
@@ -22,8 +20,8 @@ export function LetterPicker({ onPick, disabled }: LetterPickerProps) {
     const tick = () => {
       const elapsed = Date.now() - startedAt;
       setSpinLetter(TUTTI_LETTERS[Math.floor(Math.random() * TUTTI_LETTERS.length)]);
-      if (elapsed < SPIN_DURATION_MS) {
-        setTimeout(tick, SPIN_TICK_MS);
+      if (elapsed < TUTTI.letterSpinMs) {
+        setTimeout(tick, TUTTI.letterSpinTickMs);
       } else {
         const finalLetter = TUTTI_LETTERS[Math.floor(Math.random() * TUTTI_LETTERS.length)];
         setSpinLetter(finalLetter);

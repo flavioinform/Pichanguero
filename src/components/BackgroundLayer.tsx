@@ -3,9 +3,10 @@ import type { Game } from '../types';
 interface BackgroundLayerProps {
   games: Game[];
   selectedIndex: number;
+  themeUrl: string | null;
 }
 
-export function BackgroundLayer({ games, selectedIndex }: BackgroundLayerProps) {
+export function BackgroundLayer({ games, selectedIndex, themeUrl }: BackgroundLayerProps) {
   return (
     <>
       <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
@@ -21,7 +22,7 @@ export function BackgroundLayer({ games, selectedIndex }: BackgroundLayerProps) 
             }}
           >
             <img
-              src={game.bgImageUrl}
+              src={themeUrl ?? game.bgImageUrl}
               alt=""
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
             />

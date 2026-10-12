@@ -243,7 +243,7 @@ function TextInput({
       style={{
         padding: '12px 16px',
         fontSize: 16,
-        background: 'rgba(18,18,20,0.8)',
+        background: colors.surfaceRaised,
         border: `1px solid ${colors.accent}`,
         color: '#fff',
         fontFamily: fonts.body,
@@ -300,5 +300,5 @@ function SecondaryButton({ label, onClick }: { label: string; onClick: () => voi
 }
 
 function ErrorText({ text }: { text: string }) {
-  return <div style={{ color: '#e05a5a', fontSize: 14 }}>{text}</div>;
+  return <div style={{ color: colors.danger, fontSize: 14 }}>{text}</div>;
 }

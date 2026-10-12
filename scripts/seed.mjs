@@ -98,6 +98,45 @@ async function seedGames(urls) {
       is_flagship: false,
       sort_order: 3,
     },
+    {
+      id: 'career',
+      name: 'Construí tu carrera futbolística',
+      short_desc:
+        'Elegí tu origen, tomá decisiones clave y dejá que el destino te lleve a una trayectoria única de títulos, estadísticas y momentos decisivos.',
+      how_to_play:
+        'Creá tu identidad, elegí dónde arrancar tu carrera y simulá temporada a temporada: subís de nivel, firmás nuevos clubes y vivís lesiones, títulos y convocatorias a la selección.',
+      // TODO: replace with a dedicated bg-career.png once that asset exists;
+      // reusing bg-gato.png as a placeholder so the seed stays self-contained.
+      icon_key: 'career',
+      bg_image_url: urls['bg-gato.png'],
+      is_flagship: false,
+      sort_order: 4,
+    },
+    {
+      id: 'headsoccer',
+      name: 'Head Soccer',
+      short_desc: 'Fútbol de cabezones: saltá, pateá y metela antes que tu rival en una cancha chica y veloz.',
+      how_to_play:
+        'Movete y saltá para interceptar la pelota, pateala hacia el arco rival. Gana quien llegue primero a 5 goles o vaya arriba cuando se acabe el tiempo.',
+      // TODO: replace with a dedicated bg-headsoccer.png once that asset exists.
+      icon_key: 'headsoccer',
+      bg_image_url: urls['bg-tutti.png'],
+      is_flagship: false,
+      sort_order: 5,
+    },
+    {
+      id: 'auction',
+      name: 'Subasta futbolera',
+      short_desc:
+        'Pujá por futbolistas misteriosos con un presupuesto que definís vos. Silueta, pistas que se destapan y la cabeza fría para no pasarte de precio.',
+      how_to_play:
+        'Cada lote muestra la silueta de un jugador y una pista nueva cada pocos segundos. Pujá antes de que cierre el reloj: gana la puja más alta y paga ese precio. Suma puntos por los partidos que el jugador tiene con su selección; gana quien más junte, online o contra la CPU.',
+      // TODO: replace with a dedicated bg-auction.png once that asset exists.
+      icon_key: 'auction',
+      bg_image_url: urls['bg-tutti.png'],
+      is_flagship: false,
+      sort_order: 6,
+    },
   ];
 
   const { error } = await supabase.from('games').upsert(games, { onConflict: 'id' });

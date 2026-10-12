@@ -28,7 +28,7 @@ export function ModeCard({ icon, label, description, onClick, width = 300, heigh
         width,
         height,
         padding: '0 28px',
-        background: hovered ? 'rgba(20,30,22,0.7)' : 'rgba(18,18,20,0.6)',
+        background: hovered ? 'rgba(12,20,14,0.92)' : 'rgba(10,10,12,0.88)',
         border: `3px solid ${hovered ? colors.accent : 'rgba(255,255,255,0.18)'}`,
         boxShadow: hovered ? '0 0 32px rgba(47,174,76,0.35)' : 'none',
         color: '#fff',

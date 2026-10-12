@@ -1,0 +1,744 @@
+[
+  {
+    "name": "Pelé",
+    "text": "Santos · 1956–1974",
+    "from": 1958,
+    "to": 1977,
+    "file": "File:PELÉ - 1963.jpg"
+  },
+  {
+    "name": "Diego Maradona",
+    "text": "Napoli · 1984–1991",
+    "from": 1979,
+    "to": 1992,
+    "file": "File:Maradona 1986 vs italy.jpg"
+  },
+  {
+    "name": "Alfredo Di Stéfano",
+    "text": "Real Madrid · 1953–1964",
+    "from": 1950,
+    "to": 1966,
+    "file": "File:Alfredo Di Stéfano, Estadio, 1960-08-11 (898).jpg"
+  },
+  {
+    "name": "Franz Beckenbauer",
+    "text": "Bayern Múnich · 1964–1977",
+    "from": 1964,
+    "to": 1980,
+    "file": "File:Young Franz Beckenbauer before 1966 Football World Cup.jpg"
+  },
+  {
+    "name": "Johan Cruyff",
+    "text": "Ajax y Barcelona · 1966–1978",
+    "from": 1966,
+    "to": 1984,
+    "file": "File:Ajax-selectie presenteert zich aan de pers, nummer 15 Heinz Stuy, nummer 16 Ruud Krol, nummer 13 Johan Cruyff, nummer 14 Wim Suurbier (allen koppen).jpg"
+  },
+  {
+    "name": "Eusébio",
+    "text": "Benfica · 1960–1975",
+    "from": 1960,
+    "to": 1975,
+    "file": "File:Wereldelftal. Eusebio, Bestanddeelnr 915-6597.jpg"
+  },
+  {
+    "name": "Ferenc Puskás",
+    "text": "Real Madrid · 1958–1966",
+    "from": 1950,
+    "to": 1966,
+    "terms": [
+      "Puskás Real Madrid",
+      "Puskás Hungary 1954",
+      "Puskás Honvéd"
+    ],
+    "skip": true
+  },
+  {
+    "name": "Garrincha",
+    "text": "Botafogo · 1953–1965",
+    "from": 1953,
+    "to": 1966,
+    "file": "File:MFdSantos-Garrincha.jpg"
+  },
+  {
+    "name": "Bobby Charlton",
+    "text": "Manchester United · 1956–1973",
+    "from": 1956,
+    "to": 1973,
+    "terms": [
+      "Bobby Charlton Manchester United",
+      "Bobby Charlton 1966 World Cup",
+      "Bobby Charlton England"
+    ],
+    "skip": true
+  },
+  {
+    "name": "Bobby Moore",
+    "text": "West Ham · 1958–1974",
+    "from": 1958,
+    "to": 1977,
+    "file": "File:Bobby Moore vs Josef Masopust 1963.jpg"
+  },
+  {
+    "name": "Michel Platini",
+    "text": "Juventus · 1982–1987",
+    "from": 1976,
+    "to": 1987,
+    "file": "File:Platini panini fussball.jpg"
+  },
+  {
+    "name": "Zico",
+    "text": "Flamengo · 1971–1983",
+    "from": 1971,
+    "to": 1989,
+    "file": "File:Zico panini card 79.jpg"
+  },
+  {
+    "name": "Gerd Müller",
+    "text": "Bayern Múnich · 1964–1979",
+    "from": 1964,
+    "to": 1981,
+    "terms": [
+      "Gerd Müller Bayern",
+      "Gerd Müller 1974 World Cup",
+      "Gerd Müller Nationalmannschaft"
+    ],
+    "file": "File:Wolfgang Overath 1974.jpg"
+  },
+  {
+    "name": "George Best",
+    "text": "Manchester United · 1963–1974",
+    "from": 1963,
+    "to": 1976,
+    "file": "File:George best 1976.jpg"
+  },
+  {
+    "name": "Marco van Basten",
+    "text": "AC Milan · 1987–1993",
+    "from": 1982,
+    "to": 1995,
+    "terms": [
+      "Marco van Basten Milan",
+      "van Basten Euro 1988",
+      "van Basten Ajax"
+    ],
+    "file": "File:Marco van Basten 1990-1992.jpg"
+  },
+  {
+    "name": "Ronaldo Nazário",
+    "text": "Inter · 1997–2002",
+    "from": 1994,
+    "to": 2011,
+    "match": "ronaldo",
+    "terms": [
+      "Ronaldo Nazário Brazil 2002",
+      "Ronaldo Nazário Inter Milan",
+      "Ronaldo Nazário Real Madrid",
+      "Ronaldo Nazário Barcelona 1997"
+    ],
+    "file": "File:Ronaldo 2002 cropped.jpg"
+  },
+  {
+    "name": "Zinedine Zidane",
+    "text": "Juventus y Real Madrid · 1996–2006",
+    "from": 1994,
+    "to": 2006,
+    "file": "File:Zinedine zidane wcf 2006-edit.jpg"
+  },
+  {
+    "name": "Ronaldinho",
+    "text": "Barcelona · 2003–2008",
+    "from": 2000,
+    "to": 2015,
+    "file": "File:Ronaldinho 11feb2007.jpg"
+  },
+  {
+    "name": "Thierry Henry",
+    "text": "Arsenal · 1999–2007",
+    "from": 1997,
+    "to": 2014,
+    "file": "File:Thierry Henry (498018484).jpg"
+  },
+  {
+    "name": "Paolo Maldini",
+    "text": "AC Milan · 1985–2009",
+    "from": 1985,
+    "to": 2009,
+    "file": "File:Paolo Maldini 2009.jpg"
+  },
+  {
+    "name": "Cafu",
+    "text": "Roma y AC Milan · 1997–2008",
+    "from": 1990,
+    "to": 2008,
+    "terms": [
+      "Cafu Roma",
+      "Cafu AC Milan",
+      "Cafu Brazil 2002 World Cup",
+      "Cafu São Paulo"
+    ],
+    "file": "File:Marcos Evangelista de Moraes.jpg"
+  },
+  {
+    "name": "Roberto Carlos",
+    "text": "Real Madrid · 1996–2007",
+    "from": 1991,
+    "to": 2012,
+    "terms": [
+      "Roberto Carlos Real Madrid",
+      "Roberto Carlos Brazil 2002",
+      "Roberto Carlos Inter",
+      "Roberto Carlos Fenerbahçe"
+    ],
+    "file": "File:Roberto Carlos in Moscow 3.jpg"
+  },
+  {
+    "name": "Rivaldo",
+    "text": "Barcelona · 1997–2002",
+    "from": 1994,
+    "to": 2015,
+    "terms": [
+      "Rivaldo Barcelona",
+      "Rivaldo Brazil 2002",
+      "Rivaldo AC Milan",
+      "Rivaldo Olympiacos"
+    ],
+    "file": "File:Rivaldo (full version).jpg"
+  },
+  {
+    "name": "Gabriel Batistuta",
+    "text": "Fiorentina · 1991–2000",
+    "from": 1988,
+    "to": 2005,
+    "terms": [
+      "Batistuta Fiorentina",
+      "Batistuta Argentina 1998",
+      "Batistuta Roma",
+      "Batistuta Boca Juniors"
+    ],
+    "file": "File:Batistuta y Franco.png"
+  },
+  {
+    "name": "Roberto Baggio",
+    "text": "Juventus y AC Milan · 1990–1997",
+    "from": 1985,
+    "to": 2004,
+    "file": "File:Roberto Baggio - Italia '90.jpg"
+  },
+  {
+    "name": "Alessandro Del Piero",
+    "text": "Juventus · 1993–2012",
+    "from": 1993,
+    "to": 2014,
+    "file": "File:Del Piero Italia Mondiali 1998.jpg"
+  },
+  {
+    "name": "Dennis Bergkamp",
+    "text": "Arsenal · 1995–2006",
+    "from": 1986,
+    "to": 2006,
+    "file": "File:Dennis Bergkamp.jpg"
+  },
+  {
+    "name": "Ruud Gullit",
+    "text": "AC Milan · 1987–1993",
+    "from": 1982,
+    "to": 1998,
+    "file": "File:Ruud Gullit 1988.jpg"
+  },
+  {
+    "name": "Lothar Matthäus",
+    "text": "Inter y Bayern Múnich · 1988–2000",
+    "from": 1979,
+    "to": 2000,
+    "file": "File:Lothar Matthäus 1995.jpg"
+  },
+  {
+    "name": "Lev Yashin",
+    "text": "Dinamo Moscú · 1950–1971",
+    "from": 1950,
+    "to": 1971,
+    "qid": "Q167828",
+    "terms": [
+      "Lev Yashin goalkeeper",
+      "Yashin Dynamo Moscow",
+      "Yashin USSR 1966"
+    ],
+    "file": "File:Yashin v argentina.jpg"
+  },
+  {
+    "name": "Oliver Kahn",
+    "text": "Bayern Múnich · 1994–2008",
+    "from": 1987,
+    "to": 2008,
+    "file": "File:Oliver Kahn 06-2004.jpg"
+  },
+  {
+    "name": "Peter Schmeichel",
+    "text": "Manchester United · 1991–1999",
+    "from": 1984,
+    "to": 2003,
+    "qid": "Q182314",
+    "fullName": true,
+    "terms": [
+      "Peter Schmeichel Manchester United",
+      "Peter Schmeichel Denmark",
+      "Peter Schmeichel Aston Villa"
+    ],
+    "file": "File:Peter Schmeichel 2012-01-25 001.jpg"
+  },
+  {
+    "name": "Dino Zoff",
+    "text": "Juventus · 1972–1983",
+    "from": 1961,
+    "to": 1983,
+    "file": "File:Dino Zoff (1970).jpg"
+  },
+  {
+    "name": "Gordon Banks",
+    "text": "Leicester y Stoke City · 1959–1973",
+    "from": 1959,
+    "to": 1973,
+    "file": "File:Gordon Banks en 1970.jpg"
+  },
+  {
+    "name": "Diego Forlán",
+    "text": "Atlético de Madrid · 2007–2011",
+    "from": 2000,
+    "to": 2019,
+    "file": "File:Diego Forlán cropped.jpg"
+  },
+  {
+    "name": "Luís Figo",
+    "text": "Barcelona y Real Madrid · 1995–2005",
+    "from": 1990,
+    "to": 2009,
+    "file": "File:Luis Figo.jpg"
+  },
+  {
+    "name": "Alessandro Nesta",
+    "text": "Lazio y AC Milan · 1993–2012",
+    "from": 1993,
+    "to": 2014,
+    "file": "File:Alessandro Nesta 06052007.jpg"
+  },
+  {
+    "name": "Fabio Cannavaro",
+    "text": "Parma, Juventus y Real Madrid · 2000–2009",
+    "from": 1992,
+    "to": 2011,
+    "file": "File:Fabio Cannavaro Napoli 1990.jpg"
+  },
+  {
+    "name": "Franco Baresi",
+    "text": "AC Milan · 1977–1997",
+    "from": 1977,
+    "to": 1997,
+    "file": "File:Franco baresi panini card 1979.jpg"
+  },
+  {
+    "name": "Clarence Seedorf",
+    "text": "AC Milan · 2002–2012",
+    "from": 1992,
+    "to": 2014,
+    "file": "File:Clarence Seedorf Emirates Cup 2010.jpg"
+  },
+  {
+    "name": "Hristo Stoichkov",
+    "text": "Barcelona · 1990–1995",
+    "from": 1985,
+    "to": 2003,
+    "terms": [
+      "Stoichkov Barcelona",
+      "Stoichkov Bulgaria 1994",
+      "Hristo Stoichkov"
+    ],
+    "skip": true
+  },
+  {
+    "name": "Xavi Hernández",
+    "text": "Barcelona · 1998–2015",
+    "from": 1998,
+    "to": 2019,
+    "file": "File:Xavi Hernández Spain 2009.jpg"
+  },
+  {
+    "name": "Raúl González",
+    "text": "Real Madrid · 1994–2010",
+    "from": 1994,
+    "to": 2015,
+    "file": "File:Raul Gonzalez 10mar2007.jpg"
+  },
+  {
+    "name": "Juan Román Riquelme",
+    "text": "Boca Juniors y Villarreal · 1996–2008",
+    "from": 1996,
+    "to": 2015,
+    "file": "File:Juan Riquelme beim Audi Cup.jpg"
+  },
+  {
+    "name": "Mario Kempes",
+    "text": "Valencia y River Plate · 1976–1984",
+    "from": 1973,
+    "to": 1996,
+    "file": "File:Kempes goal final.jpg"
+  },
+  {
+    "name": "Kenny Dalglish",
+    "text": "Liverpool · 1977–1990",
+    "from": 1969,
+    "to": 1990,
+    "file": "File:Kenny dalglish figurita.jpg"
+  },
+  {
+    "name": "George Weah",
+    "text": "AC Milan y PSG · 1992–2000",
+    "from": 1988,
+    "to": 2003,
+    "file": "File:Coppa UEFA 1992-93 - Napoli vs PSG - George Weah.jpg"
+  },
+  {
+    "name": "Roger Milla",
+    "text": "Camerún · Mundiales de 1982 y 1990",
+    "from": 1970,
+    "to": 1996,
+    "terms": [
+      "Roger Milla 1990 World Cup",
+      "Roger Milla Cameroon",
+      "Roger Milla Italia 90"
+    ],
+    "skip": true
+  },
+  {
+    "name": "Gianluigi Buffon",
+    "text": "Juventus · 2001–2018",
+    "from": 1995,
+    "to": 2023,
+    "file": "File:Gianluigi Buffon (31815848711).jpg"
+  },
+  {
+    "name": "Iker Casillas",
+    "text": "Real Madrid · 1999–2015",
+    "from": 1999,
+    "to": 2020,
+    "terms": [
+      "Casillas Real Madrid",
+      "Casillas Spain 2010 World Cup",
+      "Casillas Porto"
+    ],
+    "file": "File:Iker Casillas Euro 2012 final 03.jpg"
+  },
+  {
+    "name": "Petr Cech",
+    "text": "Chelsea · 2004–2015",
+    "from": 2002,
+    "to": 2019,
+    "file": "File:Petr Čech Chelsea vs AS-Roma 10AUG2013.jpg"
+  },
+  {
+    "name": "Claudio Bravo",
+    "text": "Real Sociedad y Barcelona · 2010–2016",
+    "from": 2006,
+    "to": 2021,
+    "file": "File:Claudio Bravo Footballteam of Chile - Spain vs. Chile, 10th September 2013 (cropped).jpg"
+  },
+  {
+    "name": "Pepe",
+    "text": "Real Madrid · 2007–2017",
+    "from": 2004,
+    "to": 2024,
+    "file": "File:Beşiktaş footballteam photo (November 2017) (cropped).jpg"
+  },
+  {
+    "name": "Gerard Piqué",
+    "text": "Barcelona · 2008–2022",
+    "from": 2005,
+    "to": 2022,
+    "file": "File:Piqué.jpg"
+  },
+  {
+    "name": "Dani Alves",
+    "text": "Barcelona · 2008–2016",
+    "from": 2003,
+    "to": 2023,
+    "file": "File:Dani Alves - Scotland v Brazil - March 2011.jpg"
+  },
+  {
+    "name": "Giorgio Chiellini",
+    "text": "Juventus · 2005–2022",
+    "from": 2004,
+    "to": 2023,
+    "terms": [
+      "Chiellini Juventus",
+      "Chiellini Italy Euro 2012",
+      "Chiellini Italy"
+    ],
+    "file": "File:Singapore Selection vs Juventus, 2014, Juve's Training Session - Giorgio Chiellini, Martín Cáceres and Luca Marrone.jpg"
+  },
+  {
+    "name": "Leonardo Bonucci",
+    "text": "Juventus · 2010–2017",
+    "from": 2007,
+    "to": 2024,
+    "file": "File:Singapore Selection vs Juventus - 2014 - Leonardo Bonucci.jpg"
+  },
+  {
+    "name": "Philipp Lahm",
+    "text": "Bayern Múnich · 2002–2017",
+    "from": 2003,
+    "to": 2017,
+    "file": "File:Philipp Lahm Training FC Bayern München-3.jpg"
+  },
+  {
+    "name": "Jérôme Boateng",
+    "text": "Bayern Múnich · 2011–2021",
+    "from": 2007,
+    "to": 2022,
+    "file": "File:FIFA WC-qualification 2014 - Austria vs. Germany 2012-09-11 - Jérôme Boateng 02.JPG"
+  },
+  {
+    "name": "Diego Godín",
+    "text": "Atlético de Madrid · 2010–2019",
+    "from": 2007,
+    "to": 2022,
+    "file": "File:U03 Diego Godín 7543.jpg"
+  },
+  {
+    "name": "Carles Puyol",
+    "text": "Barcelona · 1999–2014",
+    "from": 1999,
+    "to": 2014,
+    "file": "File:Carles Puyol 18abr2007.jpg"
+  },
+  {
+    "name": "Javier Zanetti",
+    "text": "Inter · 1995–2014",
+    "from": 1995,
+    "to": 2014,
+    "file": "File:Javier Zanetti – Portugal vs. Argentina, 9th February 2011 (1).jpg"
+  },
+  {
+    "name": "John Terry",
+    "text": "Chelsea · 1998–2017",
+    "from": 2001,
+    "to": 2018,
+    "file": "File:John Terry training.jpg"
+  },
+  {
+    "name": "Rio Ferdinand",
+    "text": "Manchester United · 2002–2014",
+    "from": 1998,
+    "to": 2015,
+    "file": "File:Rio Juventus.jpg"
+  },
+  {
+    "name": "Toni Kroos",
+    "text": "Real Madrid · 2014–2024",
+    "from": 2008,
+    "to": 2024,
+    "file": "File:FIFA WC-qualification 2014 - Austria vs. Germany 2012-09-11 - Toni Kroos.JPG"
+  },
+  {
+    "name": "Andrés Iniesta",
+    "text": "Barcelona · 2002–2018",
+    "from": 2002,
+    "to": 2021,
+    "file": "File:Andrés Iniesta 21dec2006.jpg"
+  },
+  {
+    "name": "Xabi Alonso",
+    "text": "Liverpool y Real Madrid · 2004–2014",
+    "from": 2001,
+    "to": 2017,
+    "file": "File:Xabi Alonso (Real Valladolid-Real Madrid).jpg"
+  },
+  {
+    "name": "Andrea Pirlo",
+    "text": "AC Milan y Juventus · 2001–2015",
+    "from": 1998,
+    "to": 2017,
+    "file": "File:1 andrea pirlo 2014.jpg"
+  },
+  {
+    "name": "Steven Gerrard",
+    "text": "Liverpool · 1998–2015",
+    "from": 1998,
+    "to": 2016,
+    "file": "File:Steven Gerrard, 2014.jpg"
+  },
+  {
+    "name": "Frank Lampard",
+    "text": "Chelsea · 2001–2014",
+    "from": 1996,
+    "to": 2017,
+    "file": "File:Frank Lampard against AS Roma 2013 (2).jpg"
+  },
+  {
+    "name": "Paul Scholes",
+    "text": "Manchester United · 1994–2013",
+    "from": 1994,
+    "to": 2013,
+    "file": "File:P Scholes.jpg"
+  },
+  {
+    "name": "David Beckham",
+    "text": "Manchester United y Real Madrid · 1995–2007",
+    "from": 1994,
+    "to": 2013,
+    "file": "File:David Beckham 2010 LA Galaxy.jpg"
+  },
+  {
+    "name": "Bastian Schweinsteiger",
+    "text": "Bayern Múnich · 2002–2015",
+    "from": 2002,
+    "to": 2019,
+    "file": "File:Bastian Schweinsteiger - July 2015 (cropped).jpg"
+  },
+  {
+    "name": "Mesut Özil",
+    "text": "Real Madrid y Arsenal · 2010–2018",
+    "from": 2007,
+    "to": 2023,
+    "file": "File:Mesut Özil (9881761465) Cropped.jpg"
+  },
+  {
+    "name": "Wesley Sneijder",
+    "text": "Inter · 2009–2013",
+    "from": 2003,
+    "to": 2019,
+    "file": "File:Wesley Sneijder '14-15.JPG"
+  },
+  {
+    "name": "Kaká",
+    "text": "AC Milan · 2003–2009",
+    "from": 2001,
+    "to": 2017,
+    "file": "File:Kaká vs Real Sociedad 2011.jpg"
+  },
+  {
+    "name": "Javier Mascherano",
+    "text": "Barcelona · 2010–2018",
+    "from": 2004,
+    "to": 2020,
+    "file": "File:Mascherano and Duff (cropped).jpg"
+  },
+  {
+    "name": "Zlatan Ibrahimović",
+    "text": "Inter, Barcelona y PSG · 2006–2016",
+    "from": 2001,
+    "to": 2023,
+    "file": "File:Manchester United v Zorya Luhansk, September 2016 (08) - Zlatan Ibrahimović (edited).jpg"
+  },
+  {
+    "name": "Sergio Agüero",
+    "text": "Manchester City · 2011–2021",
+    "from": 2006,
+    "to": 2021,
+    "file": "File:Kun Agüero vs West Ham.png"
+  },
+  {
+    "name": "Gareth Bale",
+    "text": "Real Madrid y Tottenham · 2010–2018",
+    "from": 2007,
+    "to": 2023,
+    "file": "File:Gareth Bale playing for Wales vs Austria 01.jpg"
+  },
+  {
+    "name": "Eden Hazard",
+    "text": "Chelsea · 2012–2019",
+    "from": 2008,
+    "to": 2023,
+    "file": "File:Eden Hazard Chelsea vs AS-Roma 10AUG2013.JPG"
+  },
+  {
+    "name": "Gonzalo Higuaín",
+    "text": "Napoli y Juventus · 2013–2018",
+    "from": 2007,
+    "to": 2022,
+    "file": "File:Higuain against Zurich 11-25-2009.jpg"
+  },
+  {
+    "name": "Carlos Tevez",
+    "text": "Manchester United y Manchester City · 2007–2013",
+    "from": 2002,
+    "to": 2021,
+    "file": "File:Carlos Tévez, Real Madrid vs Juventus, 24 October 2013 Champions League.JPG"
+  },
+  {
+    "name": "Didier Drogba",
+    "text": "Chelsea · 2004–2012",
+    "from": 2002,
+    "to": 2018,
+    "file": "File:Didier Drogba 9279.JPG"
+  },
+  {
+    "name": "Samuel Eto'o",
+    "text": "Barcelona e Inter · 2004–2011",
+    "from": 2000,
+    "to": 2019,
+    "file": "File:Samuel Eto'o April 2014.jpg"
+  },
+  {
+    "name": "Wayne Rooney",
+    "text": "Manchester United · 2004–2017",
+    "from": 2002,
+    "to": 2021,
+    "file": "File:Wayne Rooney vs Everton 2009.jpg"
+  },
+  {
+    "name": "Michael Owen",
+    "text": "Liverpool · 1996–2004",
+    "from": 1996,
+    "to": 2013,
+    "file": "File:Owen4.jpg"
+  },
+  {
+    "name": "Arjen Robben",
+    "text": "Bayern Múnich · 2009–2019",
+    "from": 2002,
+    "to": 2021,
+    "file": "File:Arjen Robben v Shakhtar 2015.jpg"
+  },
+  {
+    "name": "Robin van Persie",
+    "text": "Arsenal y Manchester United · 2004–2015",
+    "from": 2002,
+    "to": 2019,
+    "file": "File:Robin Van Persie 10.jpg"
+  },
+  {
+    "name": "Franck Ribéry",
+    "text": "Bayern Múnich · 2007–2019",
+    "from": 2005,
+    "to": 2022,
+    "file": "File:Franck Ribery 2019 (cropped).jpg"
+  },
+  {
+    "name": "Miroslav Klose",
+    "text": "Lazio y Bayern Múnich · 2004–2016",
+    "from": 2002,
+    "to": 2016,
+    "file": "File:Miroslav Klose 2014.jpg"
+  },
+  {
+    "name": "Francesco Totti",
+    "text": "Roma · 1992–2017",
+    "from": 1996,
+    "to": 2017,
+    "file": "File:Francesco Totti Chelsea vs AS-Roma 10AUG2013.jpg"
+  },
+  {
+    "name": "Fernando Torres",
+    "text": "Atlético de Madrid y Liverpool · 2001–2011",
+    "from": 2001,
+    "to": 2019,
+    "file": "File:Fernando Torres 2012 FIFA Club World Cup.jpg"
+  },
+  {
+    "name": "David Villa",
+    "text": "Valencia y Barcelona · 2005–2013",
+    "from": 2003,
+    "to": 2019,
+    "file": "File:David Villa NYCFC vs. Houston Dynamo- 5-30-2015 (18289895465).jpg"
+  }
+]

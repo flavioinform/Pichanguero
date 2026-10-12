@@ -1,14 +1,7 @@
 import { supabase } from './supabaseClient';
+import { generateJoinCode } from './joinCode';
 import { TUTTI_CATEGORY_POOL, TUTTI_LETTERS, type TuttiCategory } from '../data/tuttiCategories';
 import type { InvalidReason } from './tuttiValidation';
-
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
-
-function generateJoinCode(): string {
-  let code = '';
-  for (let i = 0; i < 6; i++) code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
-  return code;
-}
 
 export type TuttiStatus = 'waiting' | 'round_active' | 'round_grace' | 'round_voting' | 'round_results' | 'finished';
 
@@ -295,11 +288,18 @@ export async function finalizeTuttiVoting(session: TuttiSessionRow): Promise<voi
       .eq('session_id', session.id)
       .eq('player_id', playerId)
       .single();
-    await supabase
+    // .select() here so an RLS rejection on another player's row surfaces
+    // as a thrown error (empty result) instead of silently leaving their
+    // score at 0 — exactly the failure mode migration 0008 fixes.
+    const { data: updated, error: updateError } = await supabase
       .from('tutti_players')
       .update({ total_score: (playerRow?.total_score ?? 0) + roundScore })
       .eq('session_id', session.id)
-      .eq('player_id', playerId);
+      .eq('player_id', playerId)
+      .select()
+      .maybeSingle();
+    if (updateError) throw new Error(updateError.message);
+    if (!updated) throw new Error('No se pudo actualizar el puntaje de un jugador (permiso denegado).');
   }
 
   const finished = session.current_round >= session.rounds_total;

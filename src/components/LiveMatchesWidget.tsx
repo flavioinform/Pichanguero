@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { colors, fonts } from '../theme';
 import { useLiveMatches } from '../hooks/useLiveMatches';
+import { MatchDetailModal } from './MatchDetailModal';
 import type { LiveMatch } from '../lib/liveMatches';
 
 const LIVE_STATUSES = new Set(['LIVE', 'IN_PLAY', 'PAUSED']);
@@ -18,6 +20,7 @@ function statusLabel(match: LiveMatch): string {
 
 export function LiveMatchesWidget() {
   const { matches, loading } = useLiveMatches();
+  const [selected, setSelected] = useState<LiveMatch | null>(null);
 
   if (loading || matches.length === 0) return null;
 
@@ -28,7 +31,7 @@ export function LiveMatchesWidget() {
     <div
       style={{
         position: 'absolute',
-        top: 100,
+        top: 40,
         right: 48,
         width: 260,
         background: 'rgba(10,10,12,0.75)',
@@ -51,8 +54,8 @@ export function LiveMatchesWidget() {
               width: 6,
               height: 6,
               borderRadius: '50%',
-              background: '#e05a5a',
-              boxShadow: '0 0 6px #e05a5a',
+              background: colors.danger,
+              boxShadow: `0 0 6px ${colors.danger}`,
             }}
           />
         )}
@@ -61,7 +64,7 @@ export function LiveMatchesWidget() {
             fontFamily: fonts.display,
             fontSize: 12,
             letterSpacing: 1,
-            color: hasLive ? '#e05a5a' : colors.accentLight,
+            color: hasLive ? colors.danger : colors.accentLight,
           }}
         >
           {hasLive ? 'EN VIVO' : 'PRÓXIMOS PARTIDOS'}
@@ -72,9 +75,13 @@ export function LiveMatchesWidget() {
         {shown.map((match, i) => (
           <div
             key={match.id}
+            onClick={() => setSelected(match)}
+            role="button"
+            tabIndex={0}
             style={{
               padding: '10px 12px',
               borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.08)' : 'none',
+              cursor: 'pointer',
             }}
           >
             <div
@@ -115,6 +122,8 @@ export function LiveMatchesWidget() {
           </div>
         ))}
       </div>
+
+      {selected && <MatchDetailModal match={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

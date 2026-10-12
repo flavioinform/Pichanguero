@@ -13,6 +13,19 @@ export function OnlineIcon() {
   );
 }
 
+/** A gamepad — used for the local two-player mode card, distinct from the
+ * "online" people icon so the two modes don't read as the same thing. */
+export function LocalPairIcon() {
+  return (
+    <svg width={72} height={72} viewBox="0 0 24 24" fill="none" stroke={colors.accentLight} strokeWidth={1.3}>
+      <rect x="2.5" y="7" width="19" height="10" rx="5" />
+      <path d="M7 10v4M5 12h4" />
+      <circle cx="16.5" cy="11" r="0.9" fill={colors.accentLight} />
+      <circle cx="14.5" cy="13.5" r="0.9" fill={colors.accentLight} />
+    </svg>
+  );
+}
+
 /** A CPU chip — used for the "Jugar offline / vs CPU" mode card. */
 export function CpuIcon() {
   return (

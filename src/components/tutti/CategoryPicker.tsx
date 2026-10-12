@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { colors, fonts } from '../../theme';
+import { colors, fonts, GRID_LINE } from '../../theme';
 import { TUTTI_CATEGORY_POOL } from '../../data/tuttiCategories';
 import { CustomSelect } from './CustomSelect';
 
@@ -74,7 +74,7 @@ export function CategoryPicker({ selected, onChange, min = 4, max = TUTTI_CATEGO
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: selected.length <= min ? 'rgba(224,90,90,0.3)' : '#e05a5a',
+                          color: selected.length <= min ? 'rgba(224,90,90,0.3)' : colors.danger,
                           fontSize: 11,
                           fontWeight: 700,
                           cursor: selected.length <= min ? 'default' : 'pointer',
@@ -147,7 +147,6 @@ export function CategoryPicker({ selected, onChange, min = 4, max = TUTTI_CATEGO
   );
 }
 
-const GRID_LINE = '1px solid rgba(255,255,255,0.15)';
 
 const cornerCellStyle: CSSProperties = {
   padding: '10px 12px',

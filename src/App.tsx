@@ -7,14 +7,56 @@ import { BackgroundLayer } from './components/BackgroundLayer';
 import { MenuScreen } from './components/MenuScreen';
 import { DetailScreen } from './components/DetailScreen';
 import { LoadingScreen } from './components/LoadingScreen';
-import { GatoScreen } from './components/gato/GatoScreen';
-import { TuttiOnlineScreen } from './components/tutti/TuttiOnlineScreen';
+import { SCREEN_BY_GAME_ID, SCREEN_COMPONENTS, isGameScreen } from './gameRegistry';
+import { ThemeSwitcher } from './components/ThemeSwitcher';
+import { Splash } from './components/Splash';
+import {
+  CUSTOM_THEME_ID,
+  MENU_THEMES,
+  imageFileToDataUrl,
+  loadCustomWallpaper,
+  loadThemeId,
+  saveCustomWallpaper,
+  saveThemeId,
+} from './lib/themes';
+import { colors } from './theme';
+import { APP } from './config/gameConfig';
 
 const logoUrl = getPublicAssetUrl(LOGO_PATH);
-
 export default function App() {
   const { games, loading, error } = useGames();
   const [state, setState] = useState<AppState>({ screen: 'menu', selectedIndex: 0 });
+  const [themeId, setThemeId] = useState<string | null>(loadThemeId);
+  const [customUrl, setCustomUrl] = useState<string | null>(loadCustomWallpaper);
+  const [splashDone, setSplashDone] = useState(false);
+  const finishSplash = useCallback(() => setSplashDone(true), []);
+
+  const themeOptions: (string | null)[] = [
+    null,
+    ...MENU_THEMES.map((t) => t.id),
+    ...(customUrl ? [CUSTOM_THEME_ID] : []),
+  ];
+  const activeTheme = MENU_THEMES.find((t) => t.id === themeId) ?? null;
+  const activeThemeUrl = themeId === CUSTOM_THEME_ID ? customUrl : (activeTheme?.url ?? null);
+  const activeThemeLabel = themeId === CUSTOM_THEME_ID ? 'Mi fondo' : (activeTheme?.label ?? 'Automático');
+
+  function cycleTheme() {
+    const next = themeOptions[(themeOptions.indexOf(themeId) + 1) % themeOptions.length];
+    setThemeId(next);
+    saveThemeId(next);
+  }
+
+  async function uploadWallpaper(file: File) {
+    try {
+      const dataUrl = await imageFileToDataUrl(file);
+      saveCustomWallpaper(dataUrl);
+      setCustomUrl(dataUrl);
+      setThemeId(CUSTOM_THEME_ID);
+      saveThemeId(CUSTOM_THEME_ID);
+    } catch (err) {
+      console.warn('No se pudo subir el fondo', err);
+    }
+  }
 
   const count = games.length;
 
@@ -41,7 +83,7 @@ export default function App() {
   const startGame = useCallback(() => {
     setState((s) => {
       const game = games[s.selectedIndex];
-      const screen = game?.id === 'gato' ? 'gato' : game?.id === 'tutti' ? 'tutti' : 'loading';
+      const screen = (game && SCREEN_BY_GAME_ID[game.id]) || 'loading';
       return { ...s, screen };
     });
   }, [games]);
@@ -67,16 +109,19 @@ export default function App() {
         } else if (e.key === 'Enter') {
           startGame();
         }
-      } else if (state.screen === 'loading' || state.screen === 'gato' || state.screen === 'tutti') {
-        if (e.key === 'Escape') {
-          backToMenu();
-        }
+      } else if (e.key === 'Escape') {
+        // loading screen or any game screen: back to the menu
+        backToMenu();
       }
     }
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [state.screen, count, next, prev, confirm, backToMenu, startGame]);
+
+  if (!splashDone) {
+    return <Splash logoUrl={logoUrl} durationMs={APP.splashMs} onDone={finishSplash} />;
+  }
 
   if (loading) {
     return (
@@ -97,10 +142,11 @@ export default function App() {
   }
 
   const selectedGame = games[state.selectedIndex];
+  const ActiveGame = isGameScreen(state.screen) ? SCREEN_COMPONENTS[state.screen] : null;
 
   return (
     <div style={rootStyle}>
-      <BackgroundLayer games={games} selectedIndex={state.selectedIndex} />
+      <BackgroundLayer games={games} selectedIndex={state.selectedIndex} themeUrl={activeThemeUrl} />
 
       {state.screen === 'menu' && (
         <MenuScreen
@@ -114,13 +160,15 @@ export default function App() {
         />
       )}
 
+      {state.screen === 'menu' && (
+        <ThemeSwitcher label={activeThemeLabel} onClick={cycleTheme} onUpload={uploadWallpaper} />
+      )}
+
       {state.screen === 'detail' && <DetailScreen game={selectedGame} onBack={backToMenu} onStart={startGame} />}
 
       {state.screen === 'loading' && <LoadingScreen gameName={selectedGame.name} onBack={backToMenu} />}
 
-      {state.screen === 'gato' && <GatoScreen onBack={backToMenu} />}
-
-      {state.screen === 'tutti' && <TuttiOnlineScreen onBack={backToMenu} />}
+      {ActiveGame && <ActiveGame onBack={backToMenu} />}
     </div>
   );
 }
@@ -130,7 +178,7 @@ const rootStyle: CSSProperties = {
   width: '100vw',
   height: '100vh',
   overflow: 'hidden',
-  background: '#0a0a0c',
+  background: colors.bg,
   fontFamily: "'Manrope', sans-serif",
   color: '#f5f5f5',
   display: 'flex',

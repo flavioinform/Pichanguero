@@ -1,16 +1,15 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { colors, fonts } from '../../theme';
-import { MAX_ATTEMPTS_PER_CELL, type GridCriterion } from '../../lib/gatoGrid';
+import { getPlayerImageByName, type GridCriterion } from '../../lib/gatoGrid';
 import { PlayerAutocomplete } from './PlayerAutocomplete';
 import { BackArrowIcon } from '../../icons/BackArrowIcon';
 import { getClubCrestUrl } from '../../lib/clubCrest';
 import { getFlagUrl } from '../../data/countryFlags';
+import { GATO } from '../../config/gameConfig';
 
 function getCriterionImageUrl(criterion: GridCriterion): string | null {
   return criterion.kind === 'club' ? getClubCrestUrl(criterion.id) : getFlagUrl(criterion.id);
 }
-
-const TURN_SECONDS = 30;
 
 // Grid geometry — kept as named constants because the line-strike overlay
 // (see AnimatedLine below) has to compute exact cell centers in pixels to
@@ -145,7 +144,7 @@ export function GatoBoard({
   const [submitting, setSubmitting] = useState(false);
   const [lastResult, setLastResult] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [timeLeft, setTimeLeft] = useState(TURN_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(GATO.turnSeconds);
 
   const isMyTurn = currentTurnPlayerId === me.id;
 
@@ -159,13 +158,43 @@ export function GatoBoard({
     if (t.isCorrect) closedCellByKey.set(key, t);
   });
 
+  // A closed cell's photo is looked up by the answer text itself (not a
+  // stored player id — see getPlayerImageByName) so it works identically
+  // whether the correct answer came from the opponent online or the CPU
+  // offline, neither of which hand the board anything beyond that text.
+  const [imageByAnswer, setImageByAnswer] = useState<Record<string, string | null>>({});
+  const closedAnswersKey = useMemo(
+    () => [...new Set([...closedCellByKey.values()].map((t) => t.answer))].join('|'),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [turns]
+  );
+
+  useEffect(() => {
+    const answers = closedAnswersKey ? closedAnswersKey.split('|') : [];
+    const missing = answers.filter((a) => !(a in imageByAnswer));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    Promise.all(missing.map(async (a) => [a, await getPlayerImageByName(a).catch(() => null)] as const)).then((pairs) => {
+      if (cancelled) return;
+      setImageByAnswer((prev) => {
+        const next = { ...prev };
+        for (const [a, url] of pairs) next[a] = url;
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [closedAnswersKey]);
+
   const playerLabel = (playerId: string) => (playerId === me.id ? me.label : opponent.label);
   const completedLines = findCompletedLines(closedCellByKey);
 
   // Resets whenever the turn changes; only the active player's own client
   // runs the countdown and fires the timeout (no server-side clock).
   useEffect(() => {
-    setTimeLeft(TURN_SECONDS);
+    setTimeLeft(GATO.turnSeconds);
     if (finished || !isMyTurn) return;
 
     const interval = setInterval(() => {
@@ -278,13 +307,14 @@ export function GatoBoard({
                 const key = `${rowIndex}:${colIndex}`;
                 const turn = closedCellByKey.get(key);
                 const attempts = attemptsByCell.get(key) ?? 0;
-                const exhausted = !turn && attempts >= MAX_ATTEMPTS_PER_CELL;
+                const exhausted = !turn && attempts >= GATO.maxAttemptsPerCell;
                 const isSelected = selected?.row === rowIndex && selected?.col === colIndex;
                 const canSelect = !finished && isMyTurn && !turn && !exhausted;
                 return (
                   <BoardCell
                     key={colIndex}
                     turn={turn}
+                    imageUrl={turn ? (imageByAnswer[turn.answer] ?? null) : null}
                     exhausted={exhausted}
                     answeredBy={turn ? playerLabel(turn.playerId) : null}
                     selected={isSelected}
@@ -313,7 +343,7 @@ export function GatoBoard({
                 y1={a.y}
                 x2={b.x}
                 y2={b.y}
-                color={line.playerId === me.id ? colors.accentLight : '#e0c15a'}
+                color={line.playerId === me.id ? colors.accentLight : colors.warning}
               />
             );
           })}
@@ -344,7 +374,7 @@ export function GatoBoard({
       )}
 
       {lastResult && !finished && <div style={{ fontSize: 14, color: colors.textSecondary }}>{lastResult}</div>}
-      {errorMsg && <div style={{ fontSize: 14, color: '#e05a5a' }}>{errorMsg}</div>}
+      {errorMsg && <div style={{ fontSize: 14, color: colors.danger }}>{errorMsg}</div>}
 
       {finished && (
         <ResultModal
@@ -373,7 +403,7 @@ function ResultModal({
   onExit: () => void;
 }) {
   const title = outcome === 'tie' ? 'Empate' : outcome === 'win' ? '¡Ganaste!' : 'Perdiste';
-  const titleColor = outcome === 'win' ? colors.accentLight : outcome === 'loss' ? '#e05a5a' : '#fff';
+  const titleColor = outcome === 'win' ? colors.accentLight : outcome === 'loss' ? colors.danger : '#fff';
 
   return (
     <div
@@ -474,8 +504,8 @@ function TimerBadge({ secondsLeft }: { secondsLeft: number }) {
         width: 34,
         height: 34,
         borderRadius: '50%',
-        border: `2px solid ${urgent ? '#e05a5a' : colors.accent}`,
-        color: urgent ? '#e05a5a' : colors.accentLight,
+        border: `2px solid ${urgent ? colors.danger : colors.accent}`,
+        color: urgent ? colors.danger : colors.accentLight,
         fontFamily: fonts.display,
         fontSize: 15,
       }}
@@ -565,6 +595,7 @@ function HeaderCell({ criterion, orientation }: { criterion: GridCriterion; orie
 
 function BoardCell({
   turn,
+  imageUrl,
   exhausted,
   answeredBy,
   selected,
@@ -572,6 +603,7 @@ function BoardCell({
   onClick,
 }: {
   turn?: BoardTurn;
+  imageUrl?: string | null;
   exhausted: boolean;
   answeredBy: string | null;
   selected: boolean;
@@ -585,11 +617,13 @@ function BoardCell({
       onClick={onClick}
       disabled={disabled}
       style={{
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 4,
+        overflow: 'hidden',
         background: selected
           ? 'rgba(47,174,76,0.25)'
           : filled
@@ -600,14 +634,66 @@ function BoardCell({
         border: `2px solid ${selected ? colors.accent : filled ? 'rgba(47,174,76,0.5)' : 'rgba(255,255,255,0.15)'}`,
         color: '#fff',
         cursor: disabled ? 'default' : 'pointer',
-        padding: 10,
+        padding: filled && imageUrl ? 0 : 10,
         textAlign: 'center',
       }}
     >
       {filled ? (
         <>
-          <span style={{ fontSize: 16, fontWeight: 700, color: colors.accentLight }}>✓ {turn!.answer}</span>
-          <span style={{ fontSize: 12, color: colors.textMuted }}>{answeredBy}</span>
+          {imageUrl ? (
+            <>
+              <img
+                src={imageUrl}
+                alt=""
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.45) 35%, rgba(0,0,0,0) 65%)',
+                }}
+              />
+              <span
+                style={{
+                  position: 'relative',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: colors.accentLight,
+                  marginTop: 'auto',
+                  textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                }}
+              >
+                {turn!.answer}
+              </span>
+              <span
+                style={{
+                  position: 'relative',
+                  fontSize: 12,
+                  color: colors.textMuted,
+                  marginBottom: 6,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                }}
+              >
+                {answeredBy}
+              </span>
+            </>
+          ) : (
+            <>
+              <span style={{ fontSize: 16, fontWeight: 700, color: colors.accentLight }}>✓</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: colors.accentLight }}>{turn!.answer}</span>
+              <span style={{ fontSize: 12, color: colors.textMuted }}>{answeredBy}</span>
+            </>
+          )}
         </>
       ) : exhausted ? (
         <span style={{ fontSize: 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>

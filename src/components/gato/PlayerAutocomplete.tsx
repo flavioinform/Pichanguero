@@ -12,13 +12,22 @@ interface PlayerAutocompleteProps {
 }
 
 const DEBOUNCE_MS = 200;
+const DROPDOWN_MIN_SPACE = 240;
 
 export function PlayerAutocomplete({ onChange, disabled, onSubmit }: PlayerAutocompleteProps) {
   const [text, setText] = useState('');
   const [suggestions, setSuggestions] = useState<PlayerSuggestion[]>([]);
   const [highlighted, setHighlighted] = useState(0);
   const [confirmed, setConfirmed] = useState<string | null>(null);
+  const [openUp, setOpenUp] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (suggestions.length === 0 || !wrapRef.current) return;
+    const rect = wrapRef.current.getBoundingClientRect();
+    setOpenUp(window.innerHeight - rect.bottom < DROPDOWN_MIN_SPACE);
+  }, [suggestions.length]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -73,7 +82,7 @@ export function PlayerAutocomplete({ onChange, disabled, onSubmit }: PlayerAutoc
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={wrapRef} style={{ position: 'relative' }}>
       <input
         autoFocus
         value={text}
@@ -87,7 +96,7 @@ export function PlayerAutocomplete({ onChange, disabled, onSubmit }: PlayerAutoc
         style={{
           padding: '10px 14px',
           fontSize: 15,
-          background: 'rgba(18,18,20,0.8)',
+          background: colors.surfaceRaised,
           border: `1px solid ${confirmed ? colors.accent : 'rgba(255,255,255,0.25)'}`,
           color: '#fff',
           fontFamily: fonts.body,
@@ -98,10 +107,9 @@ export function PlayerAutocomplete({ onChange, disabled, onSubmit }: PlayerAutoc
         <div
           style={{
             position: 'absolute',
-            top: '100%',
+            ...(openUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
             left: 0,
             right: 0,
-            marginTop: 4,
             background: '#141416',
             border: '1px solid rgba(255,255,255,0.2)',
             zIndex: 10,

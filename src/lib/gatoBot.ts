@@ -1,7 +1,5 @@
 import { getCellCandidates, type GridCriterion } from './gatoGrid';
-
-/** Chance the CPU lands a correct answer on its turn. */
-const CPU_ACCURACY = 0.6;
+import { GATO } from '../config/gameConfig';
 
 export interface CpuMove {
   rowIndex: number;
@@ -12,7 +10,7 @@ export interface CpuMove {
 }
 
 /**
- * Picks a random unclaimed cell and "answers" it: with CPU_ACCURACY
+ * Picks a random unclaimed cell and "answers" it: with GATO.cpuAccuracy
  * probability it names a real player who satisfies that cell, otherwise it
  * whiffs with a placeholder wrong guess.
  */
@@ -32,7 +30,7 @@ export async function pickCpuMove(
   const { row, col } = available[Math.floor(Math.random() * available.length)];
   const candidates = await getCellCandidates(rowCriteria[row], colCriteria[col]);
 
-  if (candidates.length > 0 && Math.random() < CPU_ACCURACY) {
+  if (candidates.length > 0 && Math.random() < GATO.cpuAccuracy) {
     const pick = candidates[Math.floor(Math.random() * candidates.length)];
     return { rowIndex: row, colIndex: col, answer: pick.name, correct: true, matchedPlayerName: pick.name };
   }

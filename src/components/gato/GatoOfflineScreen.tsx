@@ -12,11 +12,10 @@ import {
 import { pickCpuMove } from '../../lib/gatoBot';
 import { GatoBoard, type BoardTurn } from './GatoBoard';
 import { DifficultySelect } from './DifficultySelect';
+import { GATO } from '../../config/gameConfig';
 
 const ME = { id: 'me', label: 'Vos' };
 const CPU = { id: 'cpu', label: 'CPU' };
-const CPU_THINK_DELAY_MS = 1100;
-
 interface GatoOfflineScreenProps {
   onBack: () => void;
 }
@@ -76,7 +75,7 @@ export function GatoOfflineScreen({ onBack }: GatoOfflineScreenProps) {
           cpuMoveInFlight.current = false;
         }
       }
-    }, CPU_THINK_DELAY_MS);
+    }, GATO.cpuThinkDelayMs);
 
     return () => {
       cancelled = true;
@@ -118,7 +117,7 @@ export function GatoOfflineScreen({ onBack }: GatoOfflineScreenProps) {
   if (loadError) {
     return (
       <Centered>
-        <div style={{ color: '#e05a5a', fontSize: 15, textAlign: 'center', maxWidth: 400 }}>{loadError}</div>
+        <div style={{ color: colors.danger, fontSize: 15, textAlign: 'center', maxWidth: 400 }}>{loadError}</div>
         <BackButton onClick={onBack} />
       </Centered>
     );

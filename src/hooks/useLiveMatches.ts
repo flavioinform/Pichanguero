@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getLiveMatches, type LiveMatch } from '../lib/liveMatches';
-
-const POLL_MS = 60_000;
+import { APP } from '../config/gameConfig';
 
 export function useLiveMatches() {
   const [matches, setMatches] = useState<LiveMatch[]>([]);
@@ -23,7 +22,7 @@ export function useLiveMatches() {
     }
 
     load();
-    const interval = setInterval(load, POLL_MS);
+    const interval = setInterval(load, APP.liveMatchesPollMs);
     return () => {
       cancelled = true;
       clearInterval(interval);

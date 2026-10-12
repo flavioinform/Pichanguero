@@ -6,6 +6,10 @@ import type { IconKey } from '../types';
 
 type GameCardVariant = 'selected' | 'lateral' | 'detail';
 
+/** Ancho de la card seleccionada; el menú lo usa para ubicar las demás alrededor. */
+export const SELECTED_CARD_WIDTH = 'clamp(200px, 22vw, 320px)';
+export const LATERAL_CARD_WIDTH = 'clamp(260px, 28vw, 420px)';
+
 interface GameCardProps {
   variant: GameCardVariant;
   iconKey: IconKey;
@@ -60,10 +64,10 @@ export function GameCard({ variant, iconKey, onClick, ariaLabel }: GameCardProps
         style={{
           position: 'relative',
           flexShrink: 0,
-          width: 'clamp(140px, 17vw, 240px)',
+          width: SELECTED_CARD_WIDTH,
           height: 'clamp(220px, 52vh, 380px)',
           border: `3px solid ${colors.accent}`,
-          background: '#0a0a0c',
+          background: colors.bg,
           boxShadow: hovered ? '0 0 44px rgba(47,174,76,0.5)' : '0 0 32px rgba(47,174,76,0.35)',
           display: 'flex',
           alignItems: 'center',
@@ -87,7 +91,7 @@ export function GameCard({ variant, iconKey, onClick, ariaLabel }: GameCardProps
           width: 260,
           height: 320,
           border: '3px solid rgba(47,174,76,0.6)',
-          background: '#0a0a0c',
+          background: colors.bg,
           boxShadow: '0 0 40px rgba(47,174,76,0.3)',
           display: 'flex',
           alignItems: 'center',
@@ -110,16 +114,17 @@ export function GameCard({ variant, iconKey, onClick, ariaLabel }: GameCardProps
       style={{
         position: 'relative',
         flexShrink: 0,
-        width: 'clamp(70px, 7vw, 100px)',
-        height: 'clamp(90px, 22vh, 130px)',
-        marginBottom: 'clamp(40px, 15vh, 90px)',
+        width: LATERAL_CARD_WIDTH,
+        height: 'clamp(220px, 52vh, 380px)',
         border: `1px solid ${hovered ? 'rgba(47,174,76,0.7)' : 'rgba(255,255,255,0.18)'}`,
-        background: '#0a0a0c',
+        background: colors.bg,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
         cursor: 'pointer',
+        filter: hovered ? 'none' : 'grayscale(1)',
+        transition: 'filter 0.3s ease, border-color 0.3s ease',
       }}
     >
       <CardArt iconKey={iconKey} />

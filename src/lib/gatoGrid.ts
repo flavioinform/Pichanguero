@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { clubPoolForDifficulty, countryPoolForDifficulty, CLUB_COMPATIBLE_COUNTRIES, type Difficulty } from '../data/gatoPools';
+import { GATO } from '../config/gameConfig';
 
 export type { Difficulty };
 
@@ -14,13 +15,6 @@ export interface GatoGrid {
   colCriteria: [GridCriterion, GridCriterion, GridCriterion];
 }
 
-/** A cell that resists this many total attempts (correct or not, from
- * either player) closes unclaimed instead of bouncing forever — keeps a
- * match always finishable even if neither player knows a crossing. Shared
- * between the board UI (which cells are still selectable) and the
- * session/offline "is the match over" checks, so they never disagree. */
-export const MAX_ATTEMPTS_PER_CELL = 6;
-
 export interface CellAttempt {
   row: number;
   col: number;
@@ -28,7 +22,7 @@ export interface CellAttempt {
 }
 
 /** Cell keys ("row:col") that are no longer playable — either correctly
- * answered, or given up on after MAX_ATTEMPTS_PER_CELL failed attempts. */
+ * answered, or given up on after GATO.maxAttemptsPerCell failed attempts. */
 export function getClosedGatoCellKeys(attempts: CellAttempt[]): Set<string> {
   const closed = new Set<string>();
   const attemptCounts = new Map<string, number>();
@@ -39,7 +33,7 @@ export function getClosedGatoCellKeys(attempts: CellAttempt[]): Set<string> {
     if (a.correct) closed.add(key);
   }
   for (const [key, count] of attemptCounts) {
-    if (count >= MAX_ATTEMPTS_PER_CELL) closed.add(key);
+    if (count >= GATO.maxAttemptsPerCell) closed.add(key);
   }
 
   return closed;
@@ -72,7 +66,7 @@ export interface CellCandidate {
  * All real players satisfying both a club (row) and country (column)
  * criterion — used for grid validation, free-text answer checking, and the
  * CPU opponent's picks. `limit` keeps the grid-generation existence check
- * cheap since it runs up to 9×MAX_ATTEMPTS times.
+ * cheap since it runs up to 9×GATO.gridBuildAttempts times.
  */
 export async function getCellCandidates(
   rowCriterion: GridCriterion,
@@ -108,7 +102,29 @@ export async function getCellCandidates(
   return data ?? [];
 }
 
-const MAX_ATTEMPTS = 200;
+/** Escapes ILIKE's own wildcard characters before using free-text input as
+ * part of a pattern we build ourselves — same helper as tuttiValidation.ts. */
+function escapeIlike(text: string): string {
+  return text.replace(/[%_]/g, (m) => `\\${m}`);
+}
+
+/**
+ * Looks up a player's photo by exact (case/diacritic-insensitive) name
+ * match — used to show a closed Gato cell's photo instead of plain text.
+ * Works the same for an online opponent's answer (only their typed text
+ * reaches the board, nothing else) and for the offline CPU's own picks, so
+ * one lookup covers both instead of threading a player id through turns.
+ */
+export async function getPlayerImageByName(name: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('players')
+    .select('image_url')
+    .ilike('name', escapeIlike(name))
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data?.image_url as string | null) ?? null;
+}
 
 /**
  * Picks 3 clubs (rows) and 3 countries (columns) so every one of the 9
@@ -125,7 +141,7 @@ export async function generateGatoGrid(difficulty: Difficulty = 'hard'): Promise
   const clubPool = clubPoolForDifficulty(difficulty);
   const countryPool = countryPoolForDifficulty(difficulty);
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 0; attempt < GATO.gridBuildAttempts; attempt++) {
     const countries = pickRandom(countryPool, 3);
     const compatibleClubs = clubPool.filter((club) =>
       countries.every((country) => CLUB_COMPATIBLE_COUNTRIES[club.id]?.includes(country))

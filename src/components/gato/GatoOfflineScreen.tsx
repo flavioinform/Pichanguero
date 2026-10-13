@@ -4,7 +4,7 @@ import { colors, fonts } from '../../theme';
 import {
   generateGatoGrid,
   checkGatoAnswer,
-  isGatoBoardFinished,
+  isGatoGameOver,
   getClosedGatoCellKeys,
   type GatoGrid,
   type Difficulty,
@@ -88,7 +88,7 @@ export function GatoOfflineScreen({ onBack }: GatoOfflineScreenProps) {
   function applyTurn(playerId: string, rowIndex: number, colIndex: number, answer: string, correct: boolean) {
     setTurns((prev) => {
       const next = [...prev, { rowIndex, colIndex, playerId, answer, isCorrect: correct }];
-      if (isGatoBoardFinished(next.map((t) => ({ row: t.rowIndex, col: t.colIndex, correct: t.isCorrect })))) {
+      if (isGatoGameOver(next.map((t) => ({ row: t.rowIndex, col: t.colIndex, playerId: t.playerId, correct: t.isCorrect })))) {
         setFinished(true);
       }
       return next;

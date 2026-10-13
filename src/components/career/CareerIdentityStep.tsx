@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { colors, fonts } from '../../theme';
+import { useViewport } from '../../hooks/useViewport';
 import { fetchCountries, type CountryOption } from '../../lib/careerData';
 import { FlagBadge } from './FlagBadge';
 import { JerseyPhoto } from './JerseyPhoto';
@@ -26,6 +27,9 @@ const POSITIONS: { code: PositionCode; label: string; x: number; y: number }[] =
 ];
 
 export function CareerIdentityStep({ onSubmit, onBack }: CareerIdentityStepProps) {
+  const viewport = useViewport();
+  const mobile = viewport === 'mobile';
+  const tablet = viewport === 'tablet';
   const [lastName, setLastName] = useState('');
   const [number, setNumber] = useState(9);
   const [foot, setFoot] = useState<Foot>('derecha');
@@ -60,12 +64,12 @@ export function CareerIdentityStep({ onSubmit, onBack }: CareerIdentityStepProps
   }
 
   return (
-    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', overflowY: 'auto', padding: '36px 56px' }}>
-      <h1 style={{ fontFamily: fonts.display, fontSize: 32, margin: '0 0 24px 0', color: '#fff', textTransform: 'uppercase' }}>
+    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', overflowY: 'auto', padding: mobile ? '24px 16px' : tablet ? '28px 32px' : '36px 56px' }}>
+      <h1 style={{ fontFamily: fonts.display, fontSize: mobile ? 26 : 32, margin: '0 0 24px 0', color: '#fff', textTransform: 'uppercase' }}>
         Definí tu identidad
       </h1>
 
-      <div style={{ display: 'flex', gap: 48, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: mobile ? 28 : 48, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <section style={{ flex: '0 0 220px' }}>
           <Label>Identidad</Label>
           <JerseyPhoto lastName={lastName || 'JUGADOR'} number={number} countryName={nationality?.name ?? null} width={200} />
@@ -178,7 +182,7 @@ export function CareerIdentityStep({ onSubmit, onBack }: CareerIdentityStepProps
         </section>
       </div>
 
-      <div style={{ display: 'flex', gap: 14, marginTop: 32 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginTop: 32 }}>
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}

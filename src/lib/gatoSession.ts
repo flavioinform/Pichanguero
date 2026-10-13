@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { generateJoinCode } from './joinCode';
-import { generateGatoGrid, checkGatoAnswer, isGatoBoardFinished, type GridCriterion, type Difficulty } from './gatoGrid';
+import { generateGatoGrid, checkGatoAnswer, isGatoGameOver, type GridCriterion, type Difficulty } from './gatoGrid';
 
 export interface GatoSessionRow {
   id: string;
@@ -127,20 +127,20 @@ export async function submitGatoTurn(
   // failed attempts to be given up on (see isGatoBoardFinished).
   const { data: allTurns, error: turnsReadError } = await supabase
     .from('game_turns')
-    .select('row_index, col_index, is_correct')
+    .select('row_index, col_index, is_correct, player_id')
     .eq('session_id', session.id);
   if (turnsReadError) throw new Error(turnsReadError.message);
 
-  const boardFull = isGatoBoardFinished(
-    (allTurns ?? []).map((t) => ({ row: t.row_index, col: t.col_index, correct: t.is_correct }))
+  const gameOver = isGatoGameOver(
+    (allTurns ?? []).map((t) => ({ row: t.row_index, col: t.col_index, playerId: t.player_id, correct: t.is_correct }))
   );
 
   const { error: updateError } = await supabase
     .from('game_sessions')
     .update({
-      current_turn: boardFull ? null : nextTurn,
+      current_turn: gameOver ? null : nextTurn,
       scores: nextScores,
-      status: boardFull ? 'finished' : 'active',
+      status: gameOver ? 'finished' : 'active',
     })
     .eq('id', session.id);
   if (updateError) throw new Error(updateError.message);

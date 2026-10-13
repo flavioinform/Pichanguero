@@ -100,7 +100,7 @@ export function PlayerAutocomplete({ onChange, disabled, onSubmit }: PlayerAutoc
           border: `1px solid ${confirmed ? colors.accent : 'rgba(255,255,255,0.25)'}`,
           color: '#fff',
           fontFamily: fonts.body,
-          minWidth: 260,
+          minWidth: 'min(260px, 62vw)',
         }}
       />
       {suggestions.length > 0 && (

@@ -29,13 +29,21 @@ interface UseGameLoopOptions {
   p2Colors: { primary: string; secondary: string };
   p1ImageRef: MutableRefObject<HTMLImageElement | null>;
   p2ImageRef: MutableRefObject<HTMLImageElement | null>;
+  /** online host: called after every physics tick with a running tick count */
+  syncOut?: (state: GameState, tick: number) => void;
+  /** online guest: returns a corrected state when a snapshot has arrived */
+  syncIn?: (current: GameState) => GameState | null;
 }
 
 function initialHud(): Hud {
   return { scoreP1: 0, scoreP2: 0, clockMs: DEFAULT_MATCH_CONFIG.durationMs, phase: 'playing', winner: null, justScored: false };
 }
 
-export function useGameLoop({ mode, getP1Input, getP2Input, p1Colors, p2Colors, p1ImageRef, p2ImageRef }: UseGameLoopOptions) {
+export function useGameLoop({ mode, getP1Input, getP2Input, p1Colors, p2Colors, p1ImageRef, p2ImageRef, syncOut, syncIn }: UseGameLoopOptions) {
+  const syncOutRef = useRef(syncOut);
+  syncOutRef.current = syncOut;
+  const syncInRef = useRef(syncIn);
+  syncInRef.current = syncIn;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<GameState>(createInitialGameState());
   const confettiRef = useRef<ConfettiParticle[]>([]);
@@ -53,17 +61,23 @@ export function useGameLoop({ mode, getP1Input, getP2Input, p1Colors, p2Colors, 
     let accumulator = 0;
     let lastHudSync = 0;
     let prevPhase: GameState['phase'] = stateRef.current.phase;
+    let tick = 0;
 
     function frame(now: number) {
       const frameMs = Math.min(MAX_FRAME_MS, now - lastTime);
       lastTime = now;
       accumulator += frameMs;
 
+      const corrected = syncInRef.current?.(stateRef.current);
+      if (corrected) stateRef.current = corrected;
+
       while (accumulator >= STEP_MS) {
         const p1Input = getP1Input();
         const p2Input = mode === 'cpu' ? getCpuInput(stateRef.current, 1) : getP2Input();
         stateRef.current = step(stateRef.current, [p1Input, p2Input], STEP_MS);
         accumulator -= STEP_MS;
+        tick += 1;
+        syncOutRef.current?.(stateRef.current, tick);
 
         if (stateRef.current.phase === 'goal_pause' && prevPhase !== 'goal_pause') {
           const s = stateRef.current;

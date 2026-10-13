@@ -4,6 +4,7 @@ import { colors, fonts } from '../theme';
 import { GameCard } from './GameCard';
 import { FlagshipBadge } from './FlagshipBadge';
 import { BackArrowIcon } from '../icons/BackArrowIcon';
+import { useViewport } from '../hooks/useViewport';
 
 interface DetailScreenProps {
   game: Game;
@@ -14,6 +15,9 @@ interface DetailScreenProps {
 export function DetailScreen({ game, onBack, onStart }: DetailScreenProps) {
   const [backHovered, setBackHovered] = useState(false);
   const [startHovered, setStartHovered] = useState(false);
+  const viewport = useViewport();
+  const mobile = viewport === 'mobile';
+  const tablet = viewport === 'tablet';
 
   return (
     <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -23,8 +27,9 @@ export function DetailScreen({ game, onBack, onStart }: DetailScreenProps) {
         onMouseLeave={() => setBackHovered(false)}
         style={{
           position: 'absolute',
-          top: 36,
-          left: 56,
+          top: mobile ? 20 : 36,
+          left: mobile ? 16 : tablet ? 28 : 56,
+          zIndex: 1,
           display: 'flex',
           alignItems: 'center',
           gap: 8,
@@ -42,13 +47,23 @@ export function DetailScreen({ game, onBack, onStart }: DetailScreenProps) {
         VOLVER
       </button>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 72, padding: '0 90px' }}>
-        <div style={{ maxWidth: 560 }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          alignItems: mobile ? 'flex-start' : 'center',
+          gap: mobile ? 0 : tablet ? 40 : 72,
+          padding: mobile ? '72px 20px 24px' : tablet ? '0 40px' : '0 90px',
+          overflowY: 'auto',
+        }}
+      >
+        <div style={{ maxWidth: 560, minWidth: 0 }}>
           {game.isFlagship && <FlagshipBadge style={{ marginBottom: 16 }} />}
           <h1
             style={{
               fontFamily: fonts.display,
-              fontSize: 52,
+              fontSize: mobile ? 34 : tablet ? 44 : 52,
               lineHeight: 1,
               margin: '0 0 18px 0',
               textTransform: 'uppercase',
@@ -57,7 +72,7 @@ export function DetailScreen({ game, onBack, onStart }: DetailScreenProps) {
           >
             {game.name}
           </h1>
-          <p style={{ fontSize: 18, lineHeight: 1.6, color: colors.textSecondary, margin: '0 0 30px 0' }}>
+          <p style={{ fontSize: mobile ? 16 : 18, lineHeight: 1.6, color: colors.textSecondary, margin: '0 0 30px 0' }}>
             {game.shortDesc}
           </p>
 
@@ -82,6 +97,7 @@ export function DetailScreen({ game, onBack, onStart }: DetailScreenProps) {
             onMouseEnter={() => setStartHovered(true)}
             onMouseLeave={() => setStartHovered(false)}
             style={{
+              width: mobile ? '100%' : undefined,
               padding: '14px 34px',
               background: startHovered ? colors.accentDark : colors.accent,
               border: 'none',
@@ -97,12 +113,14 @@ export function DetailScreen({ game, onBack, onStart }: DetailScreenProps) {
           </button>
         </div>
 
-        <GameCard variant="detail" iconKey={game.iconKey} />
+        {!mobile && <GameCard variant="detail" iconKey={game.iconKey} />}
       </div>
 
-      <div style={{ position: 'absolute', bottom: 24, right: 40, color: colors.textDim, fontSize: 12, letterSpacing: 0.5 }}>
-        Pichanguero · v0.1.0
-      </div>
+      {!mobile && (
+        <div style={{ position: 'absolute', bottom: 24, right: 40, color: colors.textDim, fontSize: 12, letterSpacing: 0.5 }}>
+          Pichanguero · v0.1.0
+        </div>
+      )}
     </div>
   );
 }

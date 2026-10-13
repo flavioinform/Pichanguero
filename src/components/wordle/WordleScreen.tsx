@@ -158,6 +158,8 @@ export function WordleScreen({ onBack }: WordleScreenProps) {
           display: 'grid',
           gridTemplateRows: `repeat(${MAX_GUESSES}, 1fr)`,
           gap: 8,
+          // Ancho fluido: 312px en escritorio, y se achica si la pantalla es angosta o baja.
+          width: 'min(100%, 312px, max(200px, calc((100dvh - 440px) * 0.83)))',
           animation: shake ? 'wordle-shake 0.35s' : undefined,
         }}
       >
@@ -166,7 +168,7 @@ export function WordleScreen({ onBack }: WordleScreenProps) {
           const isCurrentRow = row === guesses.length && !done;
           const statuses = submitted ? evaluateGuess(submitted, target.word) : null;
           return (
-            <div key={row} style={{ display: 'grid', gridTemplateColumns: `repeat(${WORD_LENGTH}, 56px)`, gap: 8 }}>
+            <div key={row} style={{ display: 'grid', gridTemplateColumns: `repeat(${WORD_LENGTH}, 1fr)`, gap: 8 }}>
               {Array.from({ length: WORD_LENGTH }).map((_, col) => {
                 if (statuses) {
                   return (
@@ -187,9 +189,9 @@ export function WordleScreen({ onBack }: WordleScreenProps) {
       <div style={{ height: 22, fontSize: 13, color: colors.danger }}>{!done && message}</div>
 
       {!done && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', width: '100%', maxWidth: 520 }}>
           {KEYBOARD_ROWS.map((row, i) => (
-            <div key={i} style={{ display: 'flex', gap: 6 }}>
+            <div key={i} style={{ display: 'flex', gap: 'clamp(3px, 1vw, 6px)', width: '100%', justifyContent: 'center' }}>
               {row.map((key) => {
                 const status = keyStatus[key];
                 const wide = key === 'enter' || key === 'bksp';
@@ -198,9 +200,11 @@ export function WordleScreen({ onBack }: WordleScreenProps) {
                     key={key}
                     onClick={() => pressKey(key)}
                     style={{
-                      minWidth: wide ? 62 : 40,
-                      height: 52,
-                      padding: '0 6px',
+                      flex: wide ? 1.5 : 1,
+                      minWidth: 0,
+                      maxWidth: wide ? 62 : 44,
+                      height: 'clamp(42px, 7vh, 52px)',
+                      padding: '0 2px',
                       fontFamily: fonts.body,
                       fontSize: wide ? 12 : 17,
                       fontWeight: 700,
@@ -247,14 +251,14 @@ function Tile({ letter, style }: { letter: string | undefined; style: CSSPropert
   return (
     <div
       style={{
-        width: 56,
-        height: 56,
+        width: '100%',
+        aspectRatio: '1',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         border: '2px solid',
         fontFamily: fonts.display,
-        fontSize: 28,
+        fontSize: 'clamp(18px, 6vw, 28px)',
         textTransform: 'uppercase',
         boxSizing: 'border-box',
         ...style,
@@ -288,7 +292,8 @@ function ResultOverlay({
           flexDirection: 'column',
           alignItems: 'center',
           gap: 14,
-          padding: '32px 40px',
+          padding: '28px clamp(20px, 6vw, 40px)',
+          margin: '0 16px',
           background: '#141416',
           border: `2px solid ${won ? colors.accent : colors.danger}`,
           boxShadow: '0 0 40px rgba(47,174,76,0.3)',
@@ -338,16 +343,17 @@ const rootStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
-  justifyContent: 'center',
+  justifyContent: 'safe center',
   gap: 16,
-  padding: '56px 24px 24px',
+  padding: '56px 16px 24px',
   boxSizing: 'border-box',
+  overflowY: 'auto',
   background: 'rgba(6,8,12,0.92)',
 };
 
 const titleStyle: CSSProperties = {
   fontFamily: fonts.display,
-  fontSize: 34,
+  fontSize: 'clamp(26px, 8vw, 34px)',
   margin: 0,
   color: '#fff',
   textTransform: 'uppercase',
@@ -356,8 +362,8 @@ const titleStyle: CSSProperties = {
 
 const exitButtonStyle: CSSProperties = {
   position: 'absolute',
-  top: 28,
-  left: 40,
+  top: 20,
+  left: 'clamp(16px, 4vw, 40px)',
   display: 'flex',
   alignItems: 'center',
   gap: 8,

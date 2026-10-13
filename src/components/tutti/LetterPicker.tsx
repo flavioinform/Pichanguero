@@ -82,7 +82,7 @@ export function LetterPicker({ onPick, disabled }: LetterPickerProps) {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 14 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14 }}>
       <button
         onClick={spinRoulette}
         disabled={disabled}

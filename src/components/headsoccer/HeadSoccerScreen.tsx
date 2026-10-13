@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { colors, fonts } from '../../theme';
+import { ModeSelectLayout } from '../ModeSelectLayout';
 import { fetchCountries, type CountryOption } from '../../lib/careerData';
 import { ModeCard } from '../gato/ModeCard';
 import { OnlineIcon, CpuIcon, LocalPairIcon } from '../gato/ModeIcons';
@@ -79,70 +79,26 @@ export function HeadSoccerScreen({ onBack }: HeadSoccerScreenProps) {
   }
 
   return (
-    <div
-      style={{
-        position: 'relative',
-        zIndex: 2,
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 40,
-      }}
-    >
-      <h1
-        style={{
-          fontFamily: fonts.display,
-          fontSize: 48,
-          margin: 0,
-          color: '#fff',
-          textTransform: 'uppercase',
-          textShadow: '0 2px 18px rgba(0,0,0,0.6)',
-        }}
-      >
-        Head Soccer
-      </h1>
-
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 28 }}>
-        <ModeCard
-          icon={<CpuIcon />}
-          label="Vs CPU"
-          description="Un jugador contra la máquina"
-          onClick={() => chooseMode('cpu')}
-        />
-        <ModeCard
-          icon={<LocalPairIcon />}
-          label="2 jugadores"
-          description="Mismo teclado: P1 con A/D/W/S, P2 con las flechas"
-          onClick={() => chooseMode('local2p')}
-        />
-        <ModeCard
-          icon={<OnlineIcon />}
-          label="Jugar online"
-          description="Creá una sala o unite con un código"
-          onClick={() => setStep('online')}
-        />
-      </div>
-
-      <button
-        onClick={onBack}
-        style={{
-          padding: '10px 24px',
-          background: 'none',
-          border: '1px solid rgba(255,255,255,0.25)',
-          color: colors.textSecondary,
-          fontSize: 13,
-          fontWeight: 600,
-          letterSpacing: 0.5,
-          cursor: 'pointer',
-          textTransform: 'uppercase',
-        }}
-      >
-        Volver al menú
-      </button>
-    </div>
+    <ModeSelectLayout title="Head Soccer" onBack={onBack}>
+      <ModeCard
+        icon={<CpuIcon />}
+        label="Vs CPU"
+        description="Un jugador contra la máquina"
+        onClick={() => chooseMode('cpu')}
+      />
+      <ModeCard
+        icon={<LocalPairIcon />}
+        label="2 jugadores"
+        description="Mismo teclado: P1 con A/D/W/S, P2 con las flechas"
+        onClick={() => chooseMode('local2p')}
+      />
+      <ModeCard
+        icon={<OnlineIcon />}
+        label="Jugar online"
+        description="Creá una sala o unite con un código"
+        onClick={() => setStep('online')}
+      />
+    </ModeSelectLayout>
   );
 }
 

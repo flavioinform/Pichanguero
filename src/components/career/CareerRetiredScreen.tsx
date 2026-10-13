@@ -39,7 +39,7 @@ export function CareerRetiredScreen({ state, onNewCareer, onBack }: CareerRetire
         goles y {state.careerTotals.ast} asistencias.
       </p>
 
-      <div style={{ display: 'flex', gap: 40 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 24 }}>
         <Stat label="Partidos" value={state.careerTotals.pj} />
         <Stat label="Goles" value={state.careerTotals.gls} />
         <Stat label="Asistencias" value={state.careerTotals.ast} />
@@ -64,7 +64,7 @@ export function CareerRetiredScreen({ state, onNewCareer, onBack }: CareerRetire
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, marginTop: 8 }}>
         <button
           onClick={onNewCareer}
           style={{

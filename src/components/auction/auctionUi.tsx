@@ -10,19 +10,19 @@ export function CenteredCard({ children, wide }: { children: ReactNode; wide?: b
         width: '100%',
         height: '100%',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        overflowY: 'auto',
         padding: '24px',
         boxSizing: 'border-box',
       }}
     >
       <div
         style={{
+          margin: 'auto',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           gap: 20,
-          padding: '36px 44px',
+          padding: '32px clamp(18px, 5vw, 44px)',
           background: 'rgba(12,12,14,0.92)',
           borderTop: `3px solid ${colors.accent}`,
           borderLeft: '1px solid rgba(255,255,255,0.12)',
@@ -32,8 +32,6 @@ export function CenteredCard({ children, wide }: { children: ReactNode; wide?: b
           maxWidth: wide ? 760 : 560,
           width: '100%',
           boxSizing: 'border-box',
-          maxHeight: '100%',
-          overflowY: 'auto',
         }}
       >
         {children}
@@ -52,7 +50,7 @@ export function CenteredMessage({ text }: { text: string }) {
 
 export function Title({ children }: { children: ReactNode }) {
   return (
-    <h1 style={{ fontFamily: fonts.display, fontSize: 36, margin: 0, color: '#fff', textTransform: 'uppercase', textAlign: 'center' }}>
+    <h1 style={{ fontFamily: fonts.display, fontSize: 'clamp(26px, 8vw, 36px)', margin: 0, color: '#fff', textTransform: 'uppercase', textAlign: 'center' }}>
       {children}
     </h1>
   );
@@ -104,7 +102,8 @@ export function TextInput({
         border: `1px solid ${colors.accent}`,
         color: '#fff',
         fontFamily: fonts.body,
-        minWidth: 260,
+        minWidth: 'min(260px, 100%)',
+        maxWidth: '100%',
         textAlign: 'center',
       }}
     />
@@ -127,7 +126,7 @@ export function PrimaryButton({ label, onClick, disabled }: { label: string; onC
         textTransform: 'uppercase',
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.5 : 1,
-        minWidth: 220,
+        minWidth: 'min(220px, 100%)',
       }}
     >
       {label}

@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { Game } from '../types';
 import { colors, fonts } from '../theme';
-import { GameCard, LATERAL_CARD_WIDTH, SELECTED_CARD_WIDTH } from './GameCard';
+import { useViewport } from '../hooks/useViewport';
+import type { ViewportSize } from '../hooks/useViewport';
+import { CARD_HEIGHT, GameCard, LATERAL_CARD_WIDTH, SELECTED_CARD_WIDTH } from './GameCard';
 import { NavArrow } from './NavArrow';
 import { FlagshipBadge } from './FlagshipBadge';
 import { LiveMatchesWidget } from './LiveMatchesWidget';
@@ -16,8 +19,72 @@ interface MenuScreenProps {
   onConfirm: () => void;
 }
 
-const STAGE_HEIGHT = 'clamp(220px, 52vh, 380px)';
 const GALLERY_VISIBLE = 3;
+const SWIPE_MIN_PX = 40;
+
+/** Medidas del menú por tamaño de pantalla. Escritorio usa los valores originales. */
+const LAYOUT: Record<
+  ViewportSize,
+  {
+    logoHeight: number;
+    logoTop: number;
+    logoLeft: number;
+    titleSize: number;
+    descSize: number;
+    titlePadding: string;
+    rowPadding: string;
+    rowGap: number;
+    footerHeight: number;
+    cardVars: Record<string, string>;
+  }
+> = {
+  mobile: {
+    logoHeight: 40,
+    logoTop: 16,
+    logoLeft: 16,
+    titleSize: 28,
+    descSize: 14,
+    titlePadding: '0 16px 20px',
+    rowPadding: '0 8px',
+    rowGap: 4,
+    footerHeight: 56,
+    cardVars: {
+      '--card-h': 'clamp(240px, 44vh, 380px)',
+      '--card-selected-w': 'min(60vw, 260px)',
+      '--card-lateral-w': 'min(44vw, 200px)',
+    },
+  },
+  tablet: {
+    logoHeight: 44,
+    logoTop: 24,
+    logoLeft: 28,
+    titleSize: 32,
+    descSize: 15,
+    titlePadding: '0 28px 40px',
+    rowPadding: '0 20px',
+    rowGap: 12,
+    footerHeight: 72,
+    cardVars: {
+      '--card-h': 'clamp(260px, 46vh, 420px)',
+      '--card-selected-w': 'clamp(220px, 30vw, 300px)',
+      '--card-lateral-w': 'clamp(200px, 26vw, 320px)',
+    },
+  },
+  desktop: {
+    logoHeight: 52,
+    logoTop: 32,
+    logoLeft: 48,
+    titleSize: 36,
+    descSize: 16,
+    // El alto de las cards y el margen del título dependen del alto de la ventana
+    // para que el título no choque con el logo en pantallas bajas (ej. 1366×768).
+    titlePadding: '0 40px clamp(24px, 6vh, 80px)',
+    rowPadding: '0 40px',
+    rowGap: 22,
+    footerHeight: 84,
+    cardVars: { '--card-h': 'clamp(220px, 42vh, 380px)' },
+  },
+};
 
 /** Distancia del juego i a la seleccion, contando en circulo (negativo = izquierda). */
 function galleryOffset(i: number, selected: number, n: number): number {
@@ -29,6 +96,9 @@ function galleryOffset(i: number, selected: number, n: number): number {
 
 export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, onNext, onConfirm }: MenuScreenProps) {
   const selectedGame = games[selectedIndex];
+  const viewport = useViewport();
+  const layout = LAYOUT[viewport];
+  const isMobile = viewport === 'mobile';
 
   function selectAndEnter(index: number) {
     onSelect(index);
@@ -37,6 +107,7 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
 
   const [spinning, setSpinning] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(
     () => () => {
@@ -71,22 +142,43 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
     timerRef.current = window.setTimeout(tick, 70);
   }
 
+  /** En pantallas táctiles, deslizar el dedo sobre la ruleta cambia de juego. */
+  function onTouchEnd(endX: number) {
+    const startX = touchStartX.current;
+    touchStartX.current = null;
+    if (startX === null || spinning) return;
+    const dx = endX - startX;
+    if (Math.abs(dx) < SWIPE_MIN_PX) return;
+    if (dx < 0) onNext();
+    else onPrev();
+  }
+
+  const rootStyle: CSSProperties = {
+    position: 'relative',
+    zIndex: 2,
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    ...(layout.cardVars as CSSProperties),
+  };
+
   return (
-    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ position: 'absolute', top: 32, left: 48 }}>
-        <img src={logoUrl} alt="Pichanguero" style={{ height: 52, width: 'auto', display: 'block' }} />
+    <div style={rootStyle}>
+      <div style={{ position: 'absolute', top: layout.logoTop, left: layout.logoLeft }}>
+        <img src={logoUrl} alt="Pichanguero" style={{ height: layout.logoHeight, width: 'auto', display: 'block' }} />
       </div>
 
-      <LiveMatchesWidget />
+      {viewport === 'desktop' && <LiveMatchesWidget />}
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '0 0 22px 0' }}>
-        <div style={{ padding: '0 40px 80px', boxSizing: 'border-box', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
+        <div style={{ padding: layout.titlePadding, boxSizing: 'border-box', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
           <div style={{ minWidth: 0 }}>
           {selectedGame.isFlagship && <FlagshipBadge style={{ marginBottom: 10 }} />}
           <h1
             style={{
               fontFamily: fonts.display,
-              fontSize: 36,
+              fontSize: layout.titleSize,
               lineHeight: 1,
               margin: '0 0 10px 0',
               textTransform: 'uppercase',
@@ -96,7 +188,7 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
           >
             {selectedGame.name}
           </h1>
-          <p style={{ fontSize: 16, lineHeight: 1.5, color: colors.textSecondary, margin: 0, maxWidth: 620 }}>
+          <p style={{ fontSize: layout.descSize, lineHeight: 1.5, color: colors.textSecondary, margin: 0, maxWidth: 620 }}>
             {selectedGame.shortDesc}
           </p>
           <button
@@ -120,10 +212,16 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
           </div>
         </div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.18)', width: '100%' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 22, width: '100%', padding: '0 40px', boxSizing: 'border-box' }}>
-          <NavArrow direction="prev" onClick={onPrev} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: layout.rowGap, width: '100%', padding: layout.rowPadding, boxSizing: 'border-box' }}>
+          {!isMobile && <NavArrow direction="prev" onClick={onPrev} />}
 
-          <div style={{ position: 'relative', flex: 1, minWidth: 0, height: STAGE_HEIGHT, perspective: 1200 }}>
+          <div
+            onTouchStart={(e) => {
+              touchStartX.current = e.touches[0].clientX;
+            }}
+            onTouchEnd={(e) => onTouchEnd(e.changedTouches[0].clientX)}
+            style={{ position: 'relative', flex: 1, minWidth: 0, height: CARD_HEIGHT, perspective: 1200, touchAction: 'pan-y' }}
+          >
             {games.map((game, i) => {
               const d = galleryOffset(i, selectedIndex, games.length);
               const dist = Math.abs(d);
@@ -170,7 +268,7 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
             })}
           </div>
 
-          <NavArrow direction="next" onClick={onNext} />
+          {!isMobile && <NavArrow direction="next" onClick={onNext} />}
         </div>
       </div>
 
@@ -178,15 +276,18 @@ export function MenuScreen({ games, selectedIndex, logoUrl, onSelect, onPrev, on
         style={{
           position: 'relative',
           flexShrink: 0,
-          height: 84,
+          height: `calc(${layout.footerHeight}px + env(safe-area-inset-bottom))`,
           background: 'linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.55))',
           borderTop: '1px solid rgba(47,174,76,0.4)',
           display: 'flex',
           alignItems: 'center',
-          padding: '0 40px',
+          padding: isMobile ? '0 12px' : '0 40px',
+          paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
-        <div style={{ color: colors.textFooter, fontSize: 13, letterSpacing: 0.5 }}>Pichanguero · v0.1.0</div>
+        {!isMobile && (
+          <div style={{ color: colors.textFooter, fontSize: 13, letterSpacing: 0.5 }}>Pichanguero · v0.1.0</div>
+        )}
       </div>
     </div>
   );

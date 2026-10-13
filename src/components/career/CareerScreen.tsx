@@ -398,15 +398,16 @@ function ResumeChoice({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 20,
+        padding: 24,
       }}
     >
-      <h1 style={{ fontFamily: fonts.display, fontSize: 32, margin: 0, color: '#fff', textTransform: 'uppercase' }}>
+      <h1 style={{ fontFamily: fonts.display, fontSize: 32, margin: 0, color: '#fff', textTransform: 'uppercase', textAlign: 'center' }}>
         Carrera en curso
       </h1>
       <p style={{ fontSize: 14, color: colors.textSecondary, margin: 0, textAlign: 'center', maxWidth: 420 }}>
         Tenés una carrera guardada: {state.identity.lastName}, {state.age} años, OVR {state.ovr}.
       </p>
-      <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, marginTop: 8 }}>
         <button
           onClick={onContinue}
           style={{

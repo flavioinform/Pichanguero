@@ -1,98 +1,50 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { colors, fonts } from '../../theme';
-import { getPlayerImageByName, type GridCriterion } from '../../lib/gatoGrid';
+import { getPlayerImageByName, type GridCriterion, findCompletedGatoLines } from '../../lib/gatoGrid';
 import { PlayerAutocomplete } from './PlayerAutocomplete';
 import { BackArrowIcon } from '../../icons/BackArrowIcon';
 import { getClubCrestUrl } from '../../lib/clubCrest';
 import { getFlagUrl } from '../../data/countryFlags';
 import { GATO } from '../../config/gameConfig';
+import { useViewport } from '../../hooks/useViewport';
+import type { ViewportSize } from '../../hooks/useViewport';
 
 function getCriterionImageUrl(criterion: GridCriterion): string | null {
   return criterion.kind === 'club' ? getClubCrestUrl(criterion.id) : getFlagUrl(criterion.id);
 }
 
-// Grid geometry — kept as named constants because the line-strike overlay
-// (see AnimatedLine below) has to compute exact cell centers in pixels to
+// Grid geometry — kept as plain numbers (per screen size) because the line-strike
+// overlay (see AnimatedLine below) has to compute exact cell centers in pixels to
 // match the CSS grid template used further down.
-const HEADER_COL_WIDTH = 260;
-const CELL_WIDTH = 210;
-const HEADER_ROW_HEIGHT = 130;
-const CELL_HEIGHT = 170;
-const GRID_GAP = 6;
-const GRID_WIDTH = HEADER_COL_WIDTH + 3 * CELL_WIDTH + 3 * GRID_GAP;
-const GRID_HEIGHT = HEADER_ROW_HEIGHT + 3 * CELL_HEIGHT + 3 * GRID_GAP;
+interface GridGeometry {
+  headerColWidth: number;
+  cellWidth: number;
+  headerRowHeight: number;
+  cellHeight: number;
+  gap: number;
+}
 
-function cellCenter(row: number, col: number) {
+const GEOMETRY: Record<ViewportSize, GridGeometry> = {
+  desktop: { headerColWidth: 260, cellWidth: 210, headerRowHeight: 130, cellHeight: 170, gap: 6 },
+  tablet: { headerColWidth: 190, cellWidth: 150, headerRowHeight: 100, cellHeight: 130, gap: 6 },
+  mobile: { headerColWidth: 78, cellWidth: 84, headerRowHeight: 84, cellHeight: 92, gap: 4 },
+};
+
+function gridSize(g: GridGeometry) {
   return {
-    x: HEADER_COL_WIDTH + (col + 1) * GRID_GAP + col * CELL_WIDTH + CELL_WIDTH / 2,
-    y: HEADER_ROW_HEIGHT + (row + 1) * GRID_GAP + row * CELL_HEIGHT + CELL_HEIGHT / 2,
+    width: g.headerColWidth + 3 * g.cellWidth + 3 * g.gap,
+    height: g.headerRowHeight + 3 * g.cellHeight + 3 * g.gap,
+  };
+}
+
+function cellCenter(row: number, col: number, g: GridGeometry) {
+  return {
+    x: g.headerColWidth + (col + 1) * g.gap + col * g.cellWidth + g.cellWidth / 2,
+    y: g.headerRowHeight + (row + 1) * g.gap + row * g.cellHeight + g.cellHeight / 2,
   };
 }
 
 // The 8 classic tic-tac-toe lines, as [row, col] cell coordinates.
-const GATO_LINES: [number, number][][] = [
-  [
-    [0, 0],
-    [0, 1],
-    [0, 2],
-  ],
-  [
-    [1, 0],
-    [1, 1],
-    [1, 2],
-  ],
-  [
-    [2, 0],
-    [2, 1],
-    [2, 2],
-  ],
-  [
-    [0, 0],
-    [1, 0],
-    [2, 0],
-  ],
-  [
-    [0, 1],
-    [1, 1],
-    [2, 1],
-  ],
-  [
-    [0, 2],
-    [1, 2],
-    [2, 2],
-  ],
-  [
-    [0, 0],
-    [1, 1],
-    [2, 2],
-  ],
-  [
-    [0, 2],
-    [1, 1],
-    [2, 0],
-  ],
-];
-
-interface CompletedLine {
-  key: string;
-  cells: [number, number][];
-  playerId: string;
-}
-
-/** Lines where all 3 cells were correctly answered by the same player —
- * a real "gato" (tic-tac-toe) worth celebrating, independent of who's
- * ahead on total correct answers. */
-function findCompletedLines(closedCellByKey: Map<string, BoardTurn>): CompletedLine[] {
-  const found: CompletedLine[] = [];
-  for (const cells of GATO_LINES) {
-    const cellTurns = cells.map(([r, c]) => closedCellByKey.get(`${r}:${c}`));
-    const [a, b, c] = cellTurns;
-    if (a && b && c && a.playerId === b.playerId && b.playerId === c.playerId) {
-      found.push({ key: cells.map(([r, cc]) => `${r}${cc}`).join('-'), cells, playerId: a.playerId });
-    }
-  }
-  return found;
-}
 
 export interface BoardTurn {
   rowIndex: number;
@@ -147,6 +99,10 @@ export function GatoBoard({
   const [timeLeft, setTimeLeft] = useState(GATO.turnSeconds);
 
   const isMyTurn = currentTurnPlayerId === me.id;
+  const viewport = useViewport();
+  const mobile = viewport === 'mobile';
+  const geometry = GEOMETRY[viewport];
+  const grid = gridSize(geometry);
 
   // Only a correct answer closes a cell — a wrong guess or a timeout just
   // bounces the turn to the other player (see the file-level constants).
@@ -189,7 +145,10 @@ export function GatoBoard({
   }, [closedAnswersKey]);
 
   const playerLabel = (playerId: string) => (playerId === me.id ? me.label : opponent.label);
-  const completedLines = findCompletedLines(closedCellByKey);
+  const completedLines = findCompletedGatoLines(
+    turns.map((t) => ({ row: t.rowIndex, col: t.colIndex, playerId: t.playerId, correct: t.isCorrect }))
+  );
+  const gatoWinnerId = completedLines[0]?.playerId ?? null;
 
   // Resets whenever the turn changes; only the active player's own client
   // runs the countdown and fires the timeout (no server-side clock).
@@ -243,17 +202,18 @@ export function GatoBoard({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 24,
-        padding: '0 24px',
+        justifyContent: 'safe center',
+        gap: mobile ? 14 : 24,
+        padding: mobile ? '56px 8px 16px' : '0 24px',
+        overflowY: 'auto',
       }}
     >
       <button
         onClick={onExit}
         style={{
           position: 'absolute',
-          top: 28,
-          left: 40,
+          top: mobile ? 16 : 28,
+          left: mobile ? 16 : 40,
           display: 'flex',
           alignItems: 'center',
           gap: 8,
@@ -271,7 +231,7 @@ export function GatoBoard({
         SALIR
       </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 44 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: mobile ? 20 : 44 }}>
         <ScoreBadge label={me.label} score={myScore} highlight={isMyTurn && !finished} />
         <div style={{ fontFamily: fonts.display, fontSize: 28, color: colors.textMuted }}>VS</div>
         <ScoreBadge label={opponent.label} score={opponentScore} highlight={!isMyTurn && !finished} />
@@ -290,19 +250,19 @@ export function GatoBoard({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: `${HEADER_COL_WIDTH}px repeat(3, ${CELL_WIDTH}px)`,
-            gridTemplateRows: `${HEADER_ROW_HEIGHT}px repeat(3, ${CELL_HEIGHT}px)`,
-            gap: GRID_GAP,
+            gridTemplateColumns: `${geometry.headerColWidth}px repeat(3, ${geometry.cellWidth}px)`,
+            gridTemplateRows: `${geometry.headerRowHeight}px repeat(3, ${geometry.cellHeight}px)`,
+            gap: geometry.gap,
           }}
         >
           <div />
           {colCriteria.map((col) => (
-            <HeaderCell key={col.id} criterion={col} orientation="col" />
+            <HeaderCell key={col.id} criterion={col} orientation="col" size={viewport} />
           ))}
 
           {rowCriteria.map((row, rowIndex) => (
             <Fragment key={row.id}>
-              <HeaderCell criterion={row} orientation="row" />
+              <HeaderCell criterion={row} orientation="row" size={viewport} />
               {colCriteria.map((_, colIndex) => {
                 const key = `${rowIndex}:${colIndex}`;
                 const turn = closedCellByKey.get(key);
@@ -319,6 +279,7 @@ export function GatoBoard({
                     answeredBy={turn ? playerLabel(turn.playerId) : null}
                     selected={isSelected}
                     disabled={!canSelect}
+                    size={viewport}
                     onClick={() => canSelect && setSelected({ row: rowIndex, col: colIndex })}
                   />
                 );
@@ -328,14 +289,14 @@ export function GatoBoard({
         </div>
 
         <svg
-          width={GRID_WIDTH}
-          height={GRID_HEIGHT}
+          width={grid.width}
+          height={grid.height}
           style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
         >
           {completedLines.map((line) => {
             const [start, , end] = line.cells;
-            const a = cellCenter(...start);
-            const b = cellCenter(...end);
+            const a = cellCenter(...start, geometry);
+            const b = cellCenter(...end, geometry);
             return (
               <AnimatedLine
                 key={line.key}
@@ -344,6 +305,7 @@ export function GatoBoard({
                 x2={b.x}
                 y2={b.y}
                 color={line.playerId === me.id ? colors.accentLight : colors.warning}
+                strokeWidth={mobile ? 4 : 7}
               />
             );
           })}
@@ -378,7 +340,11 @@ export function GatoBoard({
 
       {finished && (
         <ResultModal
-          outcome={myScore === opponentScore ? 'tie' : myScore > opponentScore ? 'win' : 'loss'}
+          outcome={
+            gatoWinnerId
+              ? gatoWinnerId === me.id ? 'win' : 'loss'
+              : myScore === opponentScore ? 'tie' : myScore > opponentScore ? 'win' : 'loss'
+          }
           myScore={myScore}
           opponentScore={opponentScore}
           onPlayAgain={onPlayAgain}
@@ -423,7 +389,8 @@ function ResultModal({
           flexDirection: 'column',
           alignItems: 'center',
           gap: 20,
-          padding: '40px 56px',
+          padding: '32px clamp(20px, 6vw, 56px)',
+          margin: '0 16px',
           background: '#141416',
           border: `2px solid ${colors.accent}`,
           boxShadow: '0 0 40px rgba(47,174,76,0.3)',
@@ -435,7 +402,7 @@ function ResultModal({
         <div style={{ fontSize: 18, color: colors.textSecondary }}>
           {myScore} — {opponentScore}
         </div>
-        <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, marginTop: 8 }}>
           <button
             onClick={onPlayAgain}
             style={{
@@ -521,7 +488,21 @@ function TimerBadge({ secondsLeft }: { secondsLeft: number }) {
  * makes React mount a new instance exactly once per newly-completed line,
  * so it animates in once and then just stays drawn on later re-renders.
  */
-function AnimatedLine({ x1, y1, x2, y2, color }: { x1: number; y1: number; x2: number; y2: number; color: string }) {
+function AnimatedLine({
+  x1,
+  y1,
+  x2,
+  y2,
+  color,
+  strokeWidth,
+}: {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: string;
+  strokeWidth: number;
+}) {
   const [revealed, setRevealed] = useState(false);
   const length = Math.hypot(x2 - x1, y2 - y1);
 
@@ -537,7 +518,7 @@ function AnimatedLine({ x1, y1, x2, y2, color }: { x1: number; y1: number; x2: n
       x2={x2}
       y2={y2}
       stroke={color}
-      strokeWidth={7}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeDasharray={length}
       strokeDashoffset={revealed ? 0 : length}
@@ -546,9 +527,19 @@ function AnimatedLine({ x1, y1, x2, y2, color }: { x1: number; y1: number; x2: n
   );
 }
 
-function HeaderCell({ criterion, orientation }: { criterion: GridCriterion; orientation: 'row' | 'col' }) {
+function HeaderCell({
+  criterion,
+  orientation,
+  size,
+}: {
+  criterion: GridCriterion;
+  orientation: 'row' | 'col';
+  size: ViewportSize;
+}) {
   const imageUrl = getCriterionImageUrl(criterion);
-  const isRow = orientation === 'row';
+  const mobile = size === 'mobile';
+  // En celular las filas también se apilan (imagen arriba, texto abajo): la columna es angosta.
+  const isRow = orientation === 'row' && !mobile;
 
   return (
     <div
@@ -557,8 +548,8 @@ function HeaderCell({ criterion, orientation }: { criterion: GridCriterion; orie
         flexDirection: isRow ? 'row' : 'column',
         alignItems: 'center',
         justifyContent: isRow ? 'flex-end' : 'center',
-        gap: isRow ? 12 : 8,
-        padding: isRow ? '4px 16px 4px 4px' : '10px 8px',
+        gap: mobile ? 4 : isRow ? 12 : 8,
+        padding: mobile ? '4px 2px' : isRow ? '4px 16px 4px 4px' : '10px 8px',
         textAlign: isRow ? 'right' : 'center',
       }}
     >
@@ -570,8 +561,8 @@ function HeaderCell({ criterion, orientation }: { criterion: GridCriterion; orie
             e.currentTarget.style.display = 'none';
           }}
           style={{
-            width: isRow ? 44 : 40,
-            height: isRow ? 44 : 28,
+            width: mobile ? 30 : isRow ? 44 : 40,
+            height: mobile ? 24 : isRow ? 44 : 28,
             objectFit: 'contain',
             flexShrink: 0,
           }}
@@ -579,12 +570,13 @@ function HeaderCell({ criterion, orientation }: { criterion: GridCriterion; orie
       )}
       <span
         style={{
-          fontSize: 14,
+          fontSize: mobile ? 9 : size === 'tablet' ? 12 : 14,
           fontWeight: 700,
           color: colors.textSecondary,
           textTransform: 'uppercase',
-          letterSpacing: 0.3,
+          letterSpacing: mobile ? 0 : 0.3,
           lineHeight: 1.25,
+          overflowWrap: 'anywhere',
         }}
       >
         {criterion.label}
@@ -600,6 +592,7 @@ function BoardCell({
   answeredBy,
   selected,
   disabled,
+  size,
   onClick,
 }: {
   turn?: BoardTurn;
@@ -608,9 +601,11 @@ function BoardCell({
   answeredBy: string | null;
   selected: boolean;
   disabled: boolean;
+  size: ViewportSize;
   onClick: () => void;
 }) {
   const filled = Boolean(turn);
+  const compact = size === 'mobile';
 
   return (
     <button
@@ -634,7 +629,7 @@ function BoardCell({
         border: `2px solid ${selected ? colors.accent : filled ? 'rgba(47,174,76,0.5)' : 'rgba(255,255,255,0.15)'}`,
         color: '#fff',
         cursor: disabled ? 'default' : 'pointer',
-        padding: filled && imageUrl ? 0 : 10,
+        padding: filled && imageUrl ? 0 : compact ? 4 : 10,
         textAlign: 'center',
       }}
     >
@@ -666,10 +661,12 @@ function BoardCell({
               <span
                 style={{
                   position: 'relative',
-                  fontSize: 13,
+                  fontSize: compact ? 9 : 13,
                   fontWeight: 700,
                   color: colors.accentLight,
                   marginTop: 'auto',
+                  maxWidth: '100%',
+                  overflowWrap: 'anywhere',
                   textShadow: '0 1px 3px rgba(0,0,0,0.8)',
                 }}
               >
@@ -678,9 +675,9 @@ function BoardCell({
               <span
                 style={{
                   position: 'relative',
-                  fontSize: 12,
+                  fontSize: compact ? 8 : 12,
                   color: colors.textMuted,
-                  marginBottom: 6,
+                  marginBottom: compact ? 2 : 6,
                   textShadow: '0 1px 3px rgba(0,0,0,0.8)',
                 }}
               >
@@ -690,13 +687,13 @@ function BoardCell({
           ) : (
             <>
               <span style={{ fontSize: 16, fontWeight: 700, color: colors.accentLight }}>✓</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: colors.accentLight }}>{turn!.answer}</span>
-              <span style={{ fontSize: 12, color: colors.textMuted }}>{answeredBy}</span>
+              <span style={{ fontSize: compact ? 9 : 13, fontWeight: 700, color: colors.accentLight, overflowWrap: 'anywhere' }}>{turn!.answer}</span>
+              <span style={{ fontSize: compact ? 8 : 12, color: colors.textMuted }}>{answeredBy}</span>
             </>
           )}
         </>
       ) : exhausted ? (
-        <span style={{ fontSize: 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>
+        <span style={{ fontSize: compact ? 8 : 12, color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>
           Nadie acertó
         </span>
       ) : (

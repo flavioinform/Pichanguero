@@ -34,10 +34,24 @@ export const TUTTI = {
 };
 
 export const PASAPALABRA = {
+  /** solo: the whole rosco; online duel: each player's own time bank */
   roundSeconds: 180,
+  /** online duel: a wrong answer also hands the turn over, like the TV show */
+  wrongAnswerPassesTurn: true,
+  /** online duel: how long past a player's bank before anyone may close their turn */
+  expireGraceMs: 1500,
 };
 
 export const HEAD_SOCCER_ONLINE = {
+  /** Realtime drops anything above its per-second limit, so the match sends
+   * little: inputs only when they change, plus a periodic snapshot. */
+  realtimeEventsPerSecond: 30,
+  /** the host sends the authoritative game state every this many physics ticks (60/s) */
+  snapshotEveryTicks: 6,
+  /** an input is resent at least this often even if unchanged, to recover a lost message */
+  inputHeartbeatMs: 300,
+  /** a player's own position is kept (not snapped) while it's within this many px of the host's */
+  ownPositionTolerancePx: 60,
   /** how often each peer says "still here" */
   pingIntervalMs: 2000,
   /** silence longer than this shows the "reconnecting" banner */

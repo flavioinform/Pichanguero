@@ -255,7 +255,7 @@ export function AuctionOfflineScreen({ onBack }: AuctionOfflineScreenProps) {
   const toBoardBid = (b: AuctionBid): BoardBid => ({ label: labelFor(b.playerKey), amount: b.amount, mine: b.playerKey === ME });
 
   return (
-    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto' }}>
+    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', alignItems: 'safe center', justifyContent: 'center', overflowY: 'auto' }}>
       <AuctionBoard
         phase={game.phase}
         round={game.roundIdx + 1}

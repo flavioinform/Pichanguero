@@ -134,6 +134,19 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
     return out;
   }, [players, results, lotsById, formation]);
 
+  const [bidAlert, setBidAlert] = useState<string | null>(null);
+  const lastBidId = useRef<string | null>(null);
+  useEffect(() => {
+    const roundRows = bids.filter((b) => b.round === round);
+    const latest = roundRows[roundRows.length - 1];
+    if (!latest || latest.id === lastBidId.current) return;
+    lastBidId.current = latest.id;
+    setBidAlert(`${nameOf(latest.player_id)} pujó ${latest.amount}M`);
+    const timeout = setTimeout(() => setBidAlert(null), 3000);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bids, round, players]);
+
   if (authLoading) return <CenteredMessage text="Conectando…" />;
 
   if (!nickname) {
@@ -253,7 +266,29 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
       const revealLeft = Math.max(0, Math.ceil((AUCTION.revealMs - (now - (revealSeenAt.current || now))) / 1000));
 
       return (
-        <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflowY: 'auto', gap: 8 }}>
+        <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'safe center', overflowY: 'auto', gap: 8 }}>
+          {bidAlert && session.status === 'bidding' && (
+            <div
+              role="status"
+              style={{
+                position: 'absolute',
+                top: 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 5,
+                padding: '10px 22px',
+                background: 'rgba(224,193,90,0.95)',
+                color: '#0a0a0c',
+                fontWeight: 800,
+                fontSize: 15,
+                letterSpacing: 0.5,
+                textTransform: 'uppercase',
+                boxShadow: '0 0 24px rgba(224,193,90,0.5)',
+              }}
+            >
+              ⚡ {bidAlert}
+            </div>
+          )}
           <AuctionBoard
             phase={session.status}
             round={round}
@@ -295,7 +330,7 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
           <div
             style={{
               fontFamily: fonts.display,
-              fontSize: 36,
+              fontSize: 'clamp(26px, 9vw, 36px)',
               letterSpacing: 6,
               color: colors.accentLight,
               border: `2px solid ${colors.accent}`,

@@ -1,4 +1,5 @@
 import { colors, fonts } from '../../theme';
+import { useViewport } from '../../hooks/useViewport';
 import type { CareerPlayerState } from '../../lib/careerTypes';
 import { CAREER } from '../../config/gameConfig';
 import { ClubCrest } from './ClubCrest';
@@ -23,16 +24,18 @@ export function CareerDashboardScreen({
   onBack,
   simulating,
 }: CareerDashboardScreenProps) {
+  const viewport = useViewport();
+  const mobile = viewport === 'mobile';
   const canRequest = state.status === 'contratado' && !state.loanParentClubId && !simulating;
   const seasonByAge = new Map(state.seasons.map((s) => [s.age, s]));
   const ages = Array.from({ length: CAREER.retirementAge - CAREER.startAge + 1 }, (_, i) => CAREER.startAge + i);
 
   return (
-    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', padding: '28px 48px' }}>
-      <div style={{ flex: 1, display: 'flex', gap: 32, minHeight: 0 }}>
-        <PlayerCard state={state} />
+    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: mobile ? '16px' : viewport === 'tablet' ? '24px 28px' : '28px 48px' }}>
+      <div style={{ flex: mobile ? 'none' : 1, display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: mobile ? 20 : 32, minHeight: mobile ? undefined : 0 }}>
+        <PlayerCard state={state} fullWidth={mobile} />
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ flex: mobile ? 'none' : 1, height: mobile ? 360 : undefined, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '50px 1fr 50px 40px 40px 40px', fontSize: 11, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, padding: '0 10px 8px', fontWeight: 700 }}>
             <span>Edad</span>
             <span>Club</span>
@@ -77,7 +80,7 @@ export function CareerDashboardScreen({
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 14, marginTop: 20, justifyContent: 'center' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: mobile ? 10 : 14, marginTop: 20, justifyContent: 'center' }}>
         <button
           onClick={onSimulate}
           disabled={simulating}
@@ -154,9 +157,9 @@ export function CareerDashboardScreen({
   );
 }
 
-function PlayerCard({ state }: { state: CareerPlayerState }) {
+function PlayerCard({ state, fullWidth }: { state: CareerPlayerState; fullWidth: boolean }) {
   return (
-    <div style={{ width: 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ width: fullWidth ? '100%' : 240, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <PlayerAvatar imageUrl={state.avatarImageUrl} lastName={state.identity.lastName} size={64} />

@@ -133,9 +133,10 @@ export function TuttiOnlineScreen({ onBack }: TuttiOnlineScreenProps) {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'safe center',
             gap: 24,
-            padding: '24px',
+            padding: 'clamp(8px, 2vw, 24px)',
+            overflowY: 'auto',
           }}
         >
           <TuttiRoundTable session={session} players={players} answers={answers} userId={userId} />
@@ -276,18 +277,19 @@ function CenteredCard({ children, wide }: { children: ReactNode; wide?: boolean 
         width: '100%',
         height: '100%',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
+        overflowY: 'auto',
+        padding: 'clamp(12px, 3vw, 24px)',
+        boxSizing: 'border-box',
       }}
     >
       <div
         style={{
+          margin: 'auto',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           gap: 20,
-          padding: '40px 48px',
+          padding: '32px clamp(18px, 5vw, 48px)',
           background: colors.surface,
           borderTop: `3px solid ${colors.accent}`,
           borderLeft: '1px solid rgba(255,255,255,0.12)',
@@ -376,7 +378,7 @@ function CenteredMessage({ text }: { text: string }) {
 
 function Title({ children }: { children: ReactNode }) {
   return (
-    <h1 style={{ fontFamily: fonts.display, fontSize: 36, margin: 0, color: '#fff', textTransform: 'uppercase' }}>
+    <h1 style={{ fontFamily: fonts.display, fontSize: 'clamp(26px, 8vw, 36px)', margin: 0, color: '#fff', textTransform: 'uppercase', textAlign: 'center' }}>
       {children}
     </h1>
   );

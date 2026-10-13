@@ -7,8 +7,9 @@ import type { IconKey } from '../types';
 type GameCardVariant = 'selected' | 'lateral' | 'detail';
 
 /** Ancho de la card seleccionada; el menú lo usa para ubicar las demás alrededor. */
-export const SELECTED_CARD_WIDTH = 'clamp(200px, 22vw, 320px)';
-export const LATERAL_CARD_WIDTH = 'clamp(260px, 28vw, 420px)';
+export const SELECTED_CARD_WIDTH = 'var(--card-selected-w, clamp(200px, 22vw, 320px))';
+export const LATERAL_CARD_WIDTH = 'var(--card-lateral-w, clamp(260px, 28vw, 420px))';
+export const CARD_HEIGHT = 'var(--card-h, clamp(220px, 52vh, 380px))';
 
 interface GameCardProps {
   variant: GameCardVariant;
@@ -65,7 +66,7 @@ export function GameCard({ variant, iconKey, onClick, ariaLabel }: GameCardProps
           position: 'relative',
           flexShrink: 0,
           width: SELECTED_CARD_WIDTH,
-          height: 'clamp(220px, 52vh, 380px)',
+          height: CARD_HEIGHT,
           border: `3px solid ${colors.accent}`,
           background: colors.bg,
           boxShadow: hovered ? '0 0 44px rgba(47,174,76,0.5)' : '0 0 32px rgba(47,174,76,0.35)',
@@ -115,7 +116,7 @@ export function GameCard({ variant, iconKey, onClick, ariaLabel }: GameCardProps
         position: 'relative',
         flexShrink: 0,
         width: LATERAL_CARD_WIDTH,
-        height: 'clamp(220px, 52vh, 380px)',
+        height: CARD_HEIGHT,
         border: `1px solid ${hovered ? 'rgba(47,174,76,0.7)' : 'rgba(255,255,255,0.18)'}`,
         background: colors.bg,
         display: 'flex',

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { colors, fonts } from '../../theme';
+import { useViewport } from '../../hooks/useViewport';
 import { CardArt } from '../CardArt';
 import type { CareerDifficulty } from '../../lib/careerTypes';
 
@@ -17,9 +18,12 @@ const OPTIONS: { value: CareerDifficulty; label: string; caption: string }[] = [
 export function CareerDifficultyStep({ onChoose, onBack }: CareerDifficultyStepProps) {
   const [selected, setSelected] = useState<CareerDifficulty>('intensa');
   const active = OPTIONS.find((o) => o.value === selected)!;
+  const viewport = useViewport();
+  const mobile = viewport === 'mobile';
+  const tablet = viewport === 'tablet';
 
   return (
-    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
       <div
         style={{
           fontSize: 12,
@@ -27,18 +31,27 @@ export function CareerDifficultyStep({ onChoose, onBack }: CareerDifficultyStepP
           letterSpacing: 2,
           color: colors.textMuted,
           textTransform: 'uppercase',
-          padding: '28px 56px 0',
+          padding: mobile ? '20px 16px 0' : tablet ? '24px 32px 0' : '28px 56px 0',
         }}
       >
         Minijuegos Copero
       </div>
 
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 72, padding: '0 90px' }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: mobile ? 'column' : 'row',
+          alignItems: mobile ? 'stretch' : 'center',
+          gap: mobile ? 20 : tablet ? 36 : 72,
+          padding: mobile ? '16px 16px 28px' : tablet ? '0 32px' : '0 90px',
+        }}
+      >
         <div
           style={{
             position: 'relative',
-            width: 340,
-            height: 440,
+            width: mobile ? '100%' : tablet ? 260 : 340,
+            height: mobile ? 200 : tablet ? 360 : 440,
             flexShrink: 0,
             background: '#111113',
             overflow: 'hidden',
@@ -47,11 +60,11 @@ export function CareerDifficultyStep({ onChoose, onBack }: CareerDifficultyStepP
           <CardArt iconKey="career" />
         </div>
 
-        <div style={{ maxWidth: 560, padding: '36px 40px', background: 'rgba(10,10,12,0.86)', border: '1px solid rgba(255,255,255,0.12)' }}>
+        <div style={{ maxWidth: 560, minWidth: 0, padding: mobile ? '22px 18px' : '36px 40px', background: 'rgba(10,10,12,0.86)', border: '1px solid rgba(255,255,255,0.12)' }}>
           <h1
             style={{
               fontFamily: fonts.display,
-              fontSize: 48,
+              fontSize: mobile ? 30 : tablet ? 40 : 48,
               lineHeight: 1.05,
               margin: '0 0 18px 0',
               textTransform: 'uppercase',
@@ -60,12 +73,12 @@ export function CareerDifficultyStep({ onChoose, onBack }: CareerDifficultyStepP
           >
             Construí tu carrera futbolística
           </h1>
-          <p style={{ fontSize: 17, lineHeight: 1.6, color: colors.textSecondary, margin: '0 0 30px 0' }}>
+          <p style={{ fontSize: mobile ? 15 : 17, lineHeight: 1.6, color: colors.textSecondary, margin: '0 0 30px 0' }}>
             Elegí tu origen, tomá decisiones clave y dejá que el destino te lleve a una trayectoria única de títulos,
             estadísticas y momentos decisivos.
           </p>
 
-          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
             {OPTIONS.map((o) => (
               <button
                 key={o.value}
@@ -87,7 +100,7 @@ export function CareerDifficultyStep({ onChoose, onBack }: CareerDifficultyStepP
           </div>
           <p style={{ fontSize: 13, color: colors.textSecondary, margin: '0 0 32px 0' }}>{active.caption}</p>
 
-          <div style={{ display: 'flex', gap: 14 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
             <button
               onClick={() => onChoose(selected)}
               style={{

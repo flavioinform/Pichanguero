@@ -19,12 +19,15 @@ import {
   saveCustomWallpaper,
   saveThemeId,
 } from './lib/themes';
+import { InstallPrompt } from './components/InstallPrompt';
+import { useViewport } from './hooks/useViewport';
 import { colors } from './theme';
 import { APP } from './config/gameConfig';
 
 const logoUrl = getPublicAssetUrl(LOGO_PATH);
 export default function App() {
   const { games, loading, error } = useGames();
+  const viewport = useViewport();
   const [state, setState] = useState<AppState>({ screen: 'menu', selectedIndex: 0 });
   const [themeId, setThemeId] = useState<string | null>(loadThemeId);
   const [customUrl, setCustomUrl] = useState<string | null>(loadCustomWallpaper);
@@ -161,8 +164,15 @@ export default function App() {
       )}
 
       {state.screen === 'menu' && (
-        <ThemeSwitcher label={activeThemeLabel} onClick={cycleTheme} onUpload={uploadWallpaper} />
+        <ThemeSwitcher
+          label={activeThemeLabel}
+          onClick={cycleTheme}
+          onUpload={uploadWallpaper}
+          compact={viewport !== 'desktop'}
+        />
       )}
+
+      {state.screen === 'menu' && <InstallPrompt />}
 
       {state.screen === 'detail' && <DetailScreen game={selectedGame} onBack={backToMenu} onStart={startGame} />}
 
@@ -176,7 +186,8 @@ export default function App() {
 const rootStyle: CSSProperties = {
   position: 'relative',
   width: '100vw',
-  height: '100vh',
+  // dvh: en celulares la barra del navegador cambia el alto visible; 100vh quedaría tapado por ella.
+  height: '100dvh',
   overflow: 'hidden',
   background: colors.bg,
   fontFamily: "'Manrope', sans-serif",

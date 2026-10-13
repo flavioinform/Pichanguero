@@ -4,7 +4,10 @@ import { colors } from '../../theme';
 import { jerseyColors } from '../../lib/countryVisuals';
 import { fetchRandomPlayerPhoto } from '../../lib/careerData';
 import { FIELD_HEIGHT, FIELD_WIDTH } from '../../lib/headSoccer/physics';
-import type { Input } from '../../lib/headSoccer/types';
+import type { GameState, Input } from '../../lib/headSoccer/types';
+import { mergeSnapshot } from '../../lib/headSoccer/netSync';
+import { HEAD_SOCCER_ONLINE } from '../../config/gameConfig';
+import { useViewport } from '../../hooks/useViewport';
 import { useGameLoop } from './useGameLoop';
 import { ClockChip, ControlHint, GoalBanner, ScoreBar } from './Hud';
 import { Controls } from './Controls';
@@ -17,6 +20,10 @@ interface OnlineProps {
   isHost: boolean;
   remoteInputRef: MutableRefObject<Input>;
   sendInput: (input: Input) => void;
+  /** host only: publish the authoritative game state */
+  sendState: (state: GameState) => void;
+  /** guest only: the newest host snapshot since the last call */
+  takeRemoteState: () => GameState | null;
   connected: boolean;
 }
 
@@ -106,10 +113,32 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
         : getLocalOnlineInput
       : () => mergeInputs(arrowInput.current, p2TouchInput.current);
 
+  // Online: both peers simulate locally with the latest inputs they know, so
+  // play looks smooth; the host's snapshots keep the two from drifting apart.
+  const lastSentPhase = useRef<GameState['phase']>('playing');
+  const syncOut =
+    mode === 'online' && online?.isHost
+      ? (state: GameState, tick: number) => {
+          const phaseChanged = state.phase !== lastSentPhase.current;
+          if (tick % HEAD_SOCCER_ONLINE.snapshotEveryTicks !== 0 && !phaseChanged) return;
+          lastSentPhase.current = state.phase;
+          online.sendState(state);
+        }
+      : undefined;
+  const syncIn =
+    mode === 'online' && online && !online.isHost
+      ? (current: GameState) => {
+          const snapshot = online.takeRemoteState();
+          return snapshot ? mergeSnapshot(current, snapshot, 1, HEAD_SOCCER_ONLINE.ownPositionTolerancePx) : null;
+        }
+      : undefined;
+
   const { canvasRef, hud, resetMatch } = useGameLoop({
     mode,
     getP1Input,
     getP2Input,
+    syncOut,
+    syncIn,
     p1Colors,
     p2Colors,
     p1ImageRef,
@@ -175,6 +204,7 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
     };
   }, []);
 
+  const mobile = useViewport() === 'mobile';
   const seconds = Math.ceil(hud.clockMs / 1000);
   const clockLabel = `${String(Math.floor(seconds / 60)).padStart(1, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
@@ -188,11 +218,20 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'safe center',
+        overflowY: 'auto',
         gap: 14,
       }}
     >
-      <div style={{ position: 'relative', width: '100%', maxWidth: 880, padding: '0 16px', boxSizing: 'border-box' }}>
+      <div
+        style={{
+          position: 'relative',
+          // Si la pantalla es baja (celular acostado), la cancha se achica para que entre completa con los controles.
+          width: `min(100%, 880px, calc((100dvh - ${mobile ? 190 : 150}px) * ${FIELD_WIDTH / FIELD_HEIGHT} + 32px))`,
+          padding: '0 16px',
+          boxSizing: 'border-box',
+        }}
+      >
         {/* Scales with the container while keeping the field's aspect ratio —
             the canvas' internal resolution (width/height attrs) stays fixed
             at FIELD_WIDTH/FIELD_HEIGHT so game-coordinate math never changes,
@@ -211,11 +250,11 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
           }}
         />
 
-        <div style={{ position: 'absolute', top: 10, left: 26, display: 'flex', gap: 8 }}>
+        <div style={{ position: 'absolute', top: 10, left: 26, display: mobile ? 'none' : 'flex', gap: 8 }}>
           {mode === 'local2p' && <ControlHint moveKeys={['A', 'D']} jumpKey="W" kickKey="S" />}
           {(mode === 'cpu' || mode === 'online') && <ControlHint moveKeys={['◀', '▶']} jumpKey="▲" kickKey="▼" />}
         </div>
-        {mode === 'local2p' && (
+        {mode === 'local2p' && !mobile && (
           <div style={{ position: 'absolute', top: 10, right: 26 }}>
             <ControlHint moveKeys={['◀', '▶']} jumpKey="▲" kickKey="▼" align="right" />
           </div>
@@ -268,8 +307,13 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
 
       {hud.phase !== 'ended' && (
         <div style={{ display: 'flex', width: '100%', maxWidth: 880, justifyContent: 'space-between', padding: '0 16px', boxSizing: 'border-box' }}>
-          <Controls inputRef={p1TouchInput} align="left" />
-          {mode === 'local2p' && <Controls inputRef={p2TouchInput} align="right" />}
+          <Controls
+            inputRef={p1TouchInput}
+            align="left"
+            size={mobile ? 56 : 40}
+            spread={mobile && mode !== 'local2p'}
+          />
+          {mode === 'local2p' && <Controls inputRef={p2TouchInput} align="right" size={mobile ? 48 : 40} />}
         </div>
       )}
 

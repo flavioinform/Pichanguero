@@ -44,6 +44,85 @@ export function isGatoBoardFinished(attempts: CellAttempt[]): boolean {
   return getClosedGatoCellKeys(attempts).size >= 9;
 }
 
+/** The 8 ways to make a gato (tic-tac-toe line) on the 3x3 board. */
+export const GATO_LINES: [number, number][][] = [
+  [
+    [0, 0],
+    [0, 1],
+    [0, 2],
+  ],
+  [
+    [1, 0],
+    [1, 1],
+    [1, 2],
+  ],
+  [
+    [2, 0],
+    [2, 1],
+    [2, 2],
+  ],
+  [
+    [0, 0],
+    [1, 0],
+    [2, 0],
+  ],
+  [
+    [0, 1],
+    [1, 1],
+    [2, 1],
+  ],
+  [
+    [0, 2],
+    [1, 2],
+    [2, 2],
+  ],
+  [
+    [0, 0],
+    [1, 1],
+    [2, 2],
+  ],
+  [
+    [0, 2],
+    [1, 1],
+    [2, 0],
+  ],
+];
+
+export interface LineTurn {
+  row: number;
+  col: number;
+  playerId: string;
+  correct: boolean;
+}
+
+export interface CompletedGatoLine {
+  key: string;
+  cells: [number, number][];
+  playerId: string;
+}
+
+/** Lines where all 3 cells were correctly answered by the same player. */
+export function findCompletedGatoLines(turns: LineTurn[]): CompletedGatoLine[] {
+  const owner = new Map<string, string>();
+  for (const t of turns) {
+    const key = `${t.row}:${t.col}`;
+    if (t.correct && !owner.has(key)) owner.set(key, t.playerId);
+  }
+  const found: CompletedGatoLine[] = [];
+  for (const cells of GATO_LINES) {
+    const [a, b, c] = cells.map(([r, cc]) => owner.get(`${r}:${cc}`));
+    if (a && a === b && b === c) {
+      found.push({ key: cells.map(([r, cc]) => `${r}${cc}`).join('-'), cells, playerId: a });
+    }
+  }
+  return found;
+}
+
+/** The match ends when a gato is made, or when every cell is resolved. */
+export function isGatoGameOver(turns: LineTurn[]): boolean {
+  return isGatoBoardFinished(turns) || findCompletedGatoLines(turns).length > 0;
+}
+
 function pickRandom<T>(pool: T[], count: number): T[] {
   const shuffled = [...pool].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);

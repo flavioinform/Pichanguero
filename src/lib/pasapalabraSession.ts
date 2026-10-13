@@ -14,6 +14,10 @@ export interface PasapalabraSessionRow {
   question_ids: string[];
   duration_seconds: number;
   started_at: string | null;
+  /** whose turn it is right now (null while waiting / once the match is over) */
+  turn_player_id: string | null;
+  /** server time the current turn began, to measure the active player's clock */
+  turn_started_at: string | null;
   created_at: string;
 }
 
@@ -24,6 +28,10 @@ export interface PasapalabraPlayerRow {
   nickname: string;
   statuses: string;
   score: number;
+  /** this player's remaining time bank, as of the start of the current turn */
+  time_left_ms: number;
+  /** the letter they'll be asked next when the turn comes back to them */
+  current_index: number;
   finished_at: string | null;
   joined_at: string;
 }
@@ -111,44 +119,57 @@ export async function joinPasapalabraSession(code: string, nickname: string): Pr
 }
 
 /** The host draws the rosco from their own unused clues and everyone in the
- * room plays that same set. */
+ * room plays that same set, one turn at a time. The server stores it, resets
+ * every player's time bank and gives the first turn to the host. */
 export async function startPasapalabra(session: PasapalabraSessionRow, usedIds: Set<string>): Promise<RoscoEntry[]> {
   const userId = await currentUserId();
   if (userId !== session.host_id) throw new Error('Solo el anfitrión puede empezar.');
 
   const ring = pickRosco(usedIds);
-  const { data, error } = await supabase
-    .from('pasapalabra_sessions')
-    .update({
-      status: 'playing',
-      question_ids: ring.map((e) => e.id),
-      started_at: new Date().toISOString(),
-    })
-    .eq('id', session.id)
-    .eq('status', 'waiting')
-    .select()
-    .maybeSingle();
+  const { error } = await supabase.rpc('pasapalabra_start', {
+    p_session_id: session.id,
+    p_question_ids: ring.map((e) => e.id),
+  });
   if (error) throw new Error(error.message);
-  if (!data) throw new Error('La sala ya no está esperando.');
   return ring;
 }
 
-export async function saveProgress(sessionId: string, statuses: LetterStatus[], score: number) {
+/** Saves the active player's rosco after a right answer (the turn stays with
+ * them), so the others can watch the letters fill in. */
+export async function saveProgress(sessionId: string, statuses: LetterStatus[], score: number, currentIndex: number) {
   const playerId = await currentUserId();
   const { error } = await supabase
     .from('pasapalabra_players')
-    .update({ statuses: encodeStatuses(statuses), score })
+    .update({ statuses: encodeStatuses(statuses), score, current_index: currentIndex })
     .eq('session_id', sessionId)
     .eq('player_id', playerId);
   if (error) throw new Error(error.message);
 }
 
-export async function finishPlayer(sessionId: string, statuses: LetterStatus[], score: number) {
-  const playerId = await currentUserId();
-  const { error } = await supabase
-    .from('pasapalabra_players')
-    .update({ statuses: encodeStatuses(statuses), score, finished_at: new Date().toISOString() })
-    .eq('session_id', sessionId)
-    .eq('player_id', playerId);
+/** The active player ends their turn: they said "pasapalabra", missed,
+ * finished the rosco or ran out of time. The server charges the elapsed time
+ * and hands the turn to the next player. */
+export async function endTurn(
+  sessionId: string,
+  statuses: LetterStatus[],
+  score: number,
+  nextIndex: number,
+  finished: boolean
+) {
+  const { error } = await supabase.rpc('pasapalabra_end_turn', {
+    p_session_id: sessionId,
+    p_statuses: encodeStatuses(statuses),
+    p_score: score,
+    p_index: nextIndex,
+    p_finished: finished,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/** Closes a turn whose time bank ran out. Anyone in the room may call it,
+ * so a player who disappeared can't freeze the match; the server only acts
+ * if the time really is up. */
+export async function expireTurn(sessionId: string) {
+  const { error } = await supabase.rpc('pasapalabra_expire_turn', { p_session_id: sessionId });
   if (error) throw new Error(error.message);
 }

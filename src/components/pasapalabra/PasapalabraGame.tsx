@@ -8,14 +8,26 @@ import {
   type LetterStatus,
   type RoscoEntry,
 } from '../../lib/pasapalabra';
+import { PASAPALABRA } from '../../config/gameConfig';
 import { Rosco } from './Rosco';
+
+/** Online duel: the game is one player's turn, not a whole match. */
+export interface DuelTurn {
+  /** where this player's rosco stands when the turn starts */
+  initialStatuses: LetterStatus[];
+  initialCurrent: number;
+  /** a right answer: the turn keeps going */
+  onCorrect: (statuses: LetterStatus[], score: number, nextIndex: number) => void;
+  /** pasapalabra, a miss, the last letter or the clock: the turn is over */
+  onEndTurn: (statuses: LetterStatus[], score: number, nextIndex: number, finished: boolean) => void;
+}
 
 interface PasapalabraGameProps {
   entries: RoscoEntry[];
   endsAt: number;
   totalSeconds: number;
-  onProgress?: (statuses: LetterStatus[], score: number) => void;
-  onFinish: (statuses: LetterStatus[], score: number, timeUp: boolean) => void;
+  onFinish?: (statuses: LetterStatus[], score: number, timeUp: boolean) => void;
+  duel?: DuelTurn;
   aside?: ReactNode;
 }
 
@@ -24,9 +36,9 @@ interface Feedback {
   text: string;
 }
 
-export function PasapalabraGame({ entries, endsAt, totalSeconds, onProgress, onFinish, aside }: PasapalabraGameProps) {
-  const [statuses, setStatuses] = useState<LetterStatus[]>(() => entries.map(() => 'pending'));
-  const [current, setCurrent] = useState(0);
+export function PasapalabraGame({ entries, endsAt, totalSeconds, onFinish, duel, aside }: PasapalabraGameProps) {
+  const [statuses, setStatuses] = useState<LetterStatus[]>(() => duel?.initialStatuses ?? entries.map(() => 'pending'));
+  const [current, setCurrent] = useState(() => duel?.initialCurrent ?? 0);
   const [input, setInput] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(() => Math.max(0, Math.ceil((endsAt - Date.now()) / 1000)));
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -34,11 +46,13 @@ export function PasapalabraGame({ entries, endsAt, totalSeconds, onProgress, onF
   const inputRef = useRef<HTMLInputElement>(null);
   const statusesRef = useRef(statuses);
   statusesRef.current = statuses;
+  const currentRef = useRef(current);
+  currentRef.current = current;
   const finishedRef = useRef(false);
   const onFinishRef = useRef(onFinish);
   onFinishRef.current = onFinish;
-  const onProgressRef = useRef(onProgress);
-  onProgressRef.current = onProgress;
+  const duelRef = useRef(duel);
+  duelRef.current = duel;
 
   const correct = statuses.filter((s) => s === 'correct').length;
 
@@ -46,12 +60,17 @@ export function PasapalabraGame({ entries, endsAt, totalSeconds, onProgress, onF
     if (!finished) inputRef.current?.focus();
   }, [current, finished]);
 
+  // Solo: the match is over. Duel: only this player's turn is.
   function endGame(finalStatuses: LetterStatus[], timeUp: boolean) {
     if (finishedRef.current) return;
     finishedRef.current = true;
     setFinished(true);
     const score = finalStatuses.filter((s) => s === 'correct').length;
-    onFinishRef.current(finalStatuses, score, timeUp);
+    if (duelRef.current) {
+      duelRef.current.onEndTurn(finalStatuses, score, currentRef.current, true);
+    } else {
+      onFinishRef.current?.(finalStatuses, score, timeUp);
+    }
   }
 
   useEffect(() => {
@@ -67,6 +86,13 @@ export function PasapalabraGame({ entries, endsAt, totalSeconds, onProgress, onF
     return () => clearInterval(interval);
   }, [endsAt, finished]);
 
+  function endTurn(finalStatuses: LetterStatus[], nextIndex: number, rosterDone: boolean) {
+    finishedRef.current = true;
+    setFinished(true);
+    const score = finalStatuses.filter((s) => s === 'correct').length;
+    duelRef.current?.onEndTurn(finalStatuses, score, nextIndex, rosterDone);
+  }
+
   function submit(e?: FormEvent) {
     e?.preventDefault();
     if (finished || !input.trim()) return;
@@ -76,13 +102,28 @@ export function PasapalabraGame({ entries, endsAt, totalSeconds, onProgress, onF
     const nextStatuses = statuses.map((s, i) =>
       i === current ? (isRight ? 'correct' : 'wrong') : s
     ) as LetterStatus[];
+    const next = nextPendingIndex(nextStatuses, current);
 
     setStatuses(nextStatuses);
     setInput('');
-    setFeedback(isRight ? { kind: 'ok', text: '¡Correcto!' } : { kind: 'bad', text: `Era: ${entry.answer}` });
-    onProgressRef.current?.(nextStatuses, nextStatuses.filter((s) => s === 'correct').length);
+    setFeedback(
+      isRight
+        ? { kind: 'ok', text: '¡Correcto!' }
+        : { kind: 'bad', text: duel && PASAPALABRA.wrongAnswerPassesTurn ? `Era: ${entry.answer}. Pasa el turno.` : `Era: ${entry.answer}` }
+    );
 
-    const next = nextPendingIndex(nextStatuses, current);
+    if (duel) {
+      if (next === null) {
+        endTurn(nextStatuses, current, true);
+      } else if (!isRight && PASAPALABRA.wrongAnswerPassesTurn) {
+        endTurn(nextStatuses, next, false);
+      } else {
+        setCurrent(next);
+        duel.onCorrect(nextStatuses, nextStatuses.filter((s) => s === 'correct').length, next);
+      }
+      return;
+    }
+
     if (next === null) {
       endGame(nextStatuses, false);
     } else {
@@ -93,8 +134,13 @@ export function PasapalabraGame({ entries, endsAt, totalSeconds, onProgress, onF
   function pasapalabra() {
     if (finished) return;
     const next = nextPendingIndex(statuses, current);
-    if (next !== null) setCurrent(next);
     setInput('');
+    if (duel) {
+      setFeedback({ kind: 'pass', text: 'Pasapalabra: le toca al rival.' });
+      endTurn(statuses, next ?? current, false);
+      return;
+    }
+    if (next !== null) setCurrent(next);
     setFeedback({ kind: 'pass', text: 'Pasapalabra: la vuelvo a preguntar al final.' });
   }
 
@@ -115,6 +161,11 @@ export function PasapalabraGame({ entries, endsAt, totalSeconds, onProgress, onF
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: 360, maxWidth: '90vw' }}>
+        {duel && (
+          <div style={{ fontSize: 12, fontWeight: 800, color: colors.accentLight, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Es tu turno
+          </div>
+        )}
         <div style={{ fontFamily: fonts.display, fontSize: 34, color: timeColor, textTransform: 'uppercase' }}>
           Con la {entry.letter}
         </div>

@@ -47,6 +47,8 @@ export function EventSceneModal({ event, countryName, onContinue }: EventSceneMo
         style={{
           width: 560,
           maxWidth: '92vw',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           padding: '48px 40px 36px',
           background: style.gradient,
           border: '1px solid rgba(255,255,255,0.14)',

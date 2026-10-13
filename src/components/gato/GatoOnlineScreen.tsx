@@ -191,6 +191,8 @@ function CenteredCard({ children }: { children: ReactNode }) {
         alignItems: 'center',
         justifyContent: 'center',
         gap: 18,
+        padding: 16,
+        overflowY: 'auto',
       }}
     >
       {children}
@@ -211,9 +213,10 @@ function Title({ children }: { children: ReactNode }) {
     <h1
       style={{
         fontFamily: fonts.display,
-        fontSize: 40,
+        fontSize: 'clamp(28px, 8vw, 40px)',
         margin: 0,
         color: '#fff',
+        textAlign: 'center',
         textTransform: 'uppercase',
       }}
     >
@@ -247,7 +250,8 @@ function TextInput({
         border: `1px solid ${colors.accent}`,
         color: '#fff',
         fontFamily: fonts.body,
-        minWidth: 260,
+        minWidth: 'min(260px, 100%)',
+        maxWidth: '100%',
         textAlign: 'center',
       }}
     />
@@ -270,7 +274,7 @@ function PrimaryButton({ label, onClick, disabled }: { label: string; onClick: (
         textTransform: 'uppercase',
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.6 : 1,
-        minWidth: 220,
+        minWidth: 'min(220px, 100%)',
       }}
     >
       {label}

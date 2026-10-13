@@ -30,7 +30,7 @@ export function HeadSoccerOnlineScreen({ onBack }: HeadSoccerOnlineScreenProps) 
       .catch(() => setCountries([]));
   }, []);
 
-  const { session, loading: sessionLoading, remoteInputRef, sendInput, connected } = useHeadSoccerSession(sessionId);
+  const { session, loading: sessionLoading, remoteInputRef, sendInput, sendState, takeRemoteState, connected } = useHeadSoccerSession(sessionId);
 
   if (authLoading) return <CenteredMessage text="Conectando…" />;
 
@@ -103,7 +103,7 @@ export function HeadSoccerOnlineScreen({ onBack }: HeadSoccerOnlineScreenProps) 
           p1CountryName={session.host_country}
           p2CountryName={session.guest_country ?? 'Desconocido'}
           onBack={onBack}
-          online={{ isHost, remoteInputRef, sendInput, connected }}
+          online={{ isHost, remoteInputRef, sendInput, sendState, takeRemoteState, connected }}
         />
       );
     }

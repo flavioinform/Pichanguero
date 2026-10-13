@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { colors, fonts, GRID_LINE } from '../../theme';
+import { colors, fonts } from '../../theme';
 import type { TuttiSessionRow, TuttiPlayerRow, TuttiAnswerRow, TuttiVerdict } from '../../lib/tuttiSession';
 import {
   categoriesForSession,
@@ -20,6 +20,21 @@ interface TuttiRoundTableProps {
   userId: string;
 }
 
+/** Fixed widths keep every category readable no matter how many there are:
+ * the sheet scrolls sideways instead of squeezing its columns. */
+const CATEGORY_WIDTH = 172;
+const PLAYER_WIDTH = 170;
+const TOTAL_WIDTH = 96;
+const FULL_CATEGORY_WIDTH = 112;
+const FULL_PLAYER_WIDTH = 150;
+const FULL_TOTAL_WIDTH = 80;
+const MIN_FIT_SCALE = 0.5;
+const MAX_FIT_SCALE = 1.7;
+
+/**
+ * The round as a sheet: categories across the top, one row per player. The
+ * player column stays pinned on the left while the sheet scrolls sideways.
+ */
 export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoundTableProps) {
   const categories = useMemo(() => categoriesForSession(session), [session]);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -27,9 +42,26 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
   const [graceLeft, setGraceLeft] = useState(TUTTI.graceSeconds);
   const [hints, setHints] = useState<Record<string, TuttiValidation>>({});
   const hintsRoundRef = useRef<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setExpanded(false);
+    const onResize = () => setViewportWidth(window.innerWidth);
+    onResize();
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [expanded]);
 
   const isHost = session.host_id === userId;
   const voting = session.status === 'round_voting';
+  const writing = session.status === 'round_active' || session.status === 'round_grace';
+  const pointsPending = writing;
 
   // Scoped to the current round only — tutti_answers keeps one row per
   // (round, player, category), so without this filter a lookup by category
@@ -58,6 +90,29 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
     }
     return groups;
   }, [answers, session.current_round]);
+
+  // Round points per player, summed from the verdicts so far — shown live
+  // while voting and final once the round is scored.
+  const roundPoints = useMemo(() => {
+    const sums: Record<string, number> = {};
+    for (const a of answers) {
+      if (a.round !== session.current_round || a.is_valid === null) continue;
+      sums[a.player_id] = (sums[a.player_id] ?? 0) + (a.points ?? 0);
+    }
+    return sums;
+  }, [answers, session.current_round]);
+
+  // How many categories each player has typed into this round — a live
+  // "who's still working" readout while the round is active.
+  const submittedCount = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const player of players) {
+      counts[player.player_id] = answers.filter(
+        (a) => a.player_id === player.player_id && a.round === session.current_round && a.answer.trim()
+      ).length;
+    }
+    return counts;
+  }, [answers, players, session.current_round]);
 
   useEffect(() => {
     setDraft(Object.fromEntries(categories.map((c) => [c.key, myAnswers[c.key]?.answer ?? ''])));
@@ -119,7 +174,7 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
   }
 
   async function handleAnswerBlur(categoryKey: string) {
-    if (session.status !== 'round_active' && session.status !== 'round_grace') return;
+    if (!writing) return;
     try {
       await submitTuttiAnswer(session, categoryKey, draft[categoryKey] ?? '');
     } catch (err) {
@@ -157,8 +212,7 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
     return players.find((p) => p.player_id === playerId)?.nickname ?? '—';
   }
 
-  function resultLabel(row: TuttiAnswerRow | undefined): string {
-    if (!row) return '—';
+  function resultLabel(row: TuttiAnswerRow): string {
     if (row.is_valid) return `✓ +${row.points}`;
     switch (row.invalid_reason) {
       case 'empty':
@@ -168,9 +222,9 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
       case 'not_found':
         return 'No existe';
       case 'voted_invalid':
-        return '✗ votado inválido';
+        return 'Votado inválido';
       default:
-        return '✗ 0';
+        return '0 pts';
     }
   }
 
@@ -180,180 +234,226 @@ export function TuttiRoundTable({ session, players, answers, userId }: TuttiRoun
     return row.points === 5 ? 'duplicate_valid' : 'unique_valid';
   }
 
-  // Round points per player, summed from the verdicts so far — shown live
-  // while voting and final once the round is scored.
-  const roundPoints = useMemo(() => {
-    const sums: Record<string, number> = {};
-    for (const a of answers) {
-      if (a.round !== session.current_round || a.is_valid === null) continue;
-      sums[a.player_id] = (sums[a.player_id] ?? 0) + (a.points ?? 0);
-    }
-    return sums;
-  }, [answers, session.current_round]);
-
-  const pointsPending = session.status === 'round_active' || session.status === 'round_grace';
-
-  // How many categories each player has at least typed something into for
-  // this round — a live "who's still working" readout while the round is
-  // active, since the table itself hides everyone else's answers until it
-  // ends.
-  const submittedCount = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const player of players) {
-      counts[player.player_id] = answers.filter(
-        (a) => a.player_id === player.player_id && a.round === session.current_round && a.answer.trim()
-      ).length;
-    }
-    return counts;
-  }, [answers, players, session.current_round]);
+  // Full screen: the whole sheet keeps compact fixed columns and is scaled to
+  // the window's width, so every category is visible at once with no
+  // sideways scroll (and it grows on wide screens instead of floating small).
+  const playerWidth = expanded ? FULL_PLAYER_WIDTH : PLAYER_WIDTH;
+  const totalWidth = expanded ? FULL_TOTAL_WIDTH : TOTAL_WIDTH;
+  const categoryWidth = expanded ? FULL_CATEGORY_WIDTH : CATEGORY_WIDTH;
+  const columns = `${playerWidth}px repeat(${categories.length}, ${categoryWidth}px) ${totalWidth}px ${totalWidth}px`;
+  const sheetWidth = playerWidth + categories.length * categoryWidth + totalWidth * 2;
+  const fitScale = expanded ? Math.min(MAX_FIT_SCALE, Math.max(MIN_FIT_SCALE, (viewportWidth - 32) / sheetWidth)) : 1;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%', maxWidth: 1100 }}>
-      {session.status === 'round_active' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-          <div style={{ fontSize: 14, color: colors.accentLight, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            Completá todas las categorías
-          </div>
-          <div style={{ display: 'flex', gap: 14, fontSize: 12, color: colors.textMuted }}>
-            {players.map((p) => (
-              <span key={p.id}>
-                {p.nickname}: {submittedCount[p.player_id] ?? 0}/{categories.length}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      {session.status === 'round_grace' && (
-        <div style={{ fontSize: 14, color: colors.warning, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          ¡Basta de {playerLabel(session.basta_player_id ?? '')}! Se corta en {graceLeft}s
-        </div>
-      )}
-      {voting && (
-        <div style={{ fontSize: 14, color: colors.warning, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          Voten cada respuesta — único = 10, repetida = 5, inválida = 0
-        </div>
-      )}
-      {(session.status === 'round_results' || session.status === 'finished') && (
-        <div style={{ fontSize: 14, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          Resultados de la ronda
-        </div>
-      )}
-
-      <div style={{ width: '100%', overflowX: 'auto', border: `1px solid ${colors.accent}` }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-          <thead>
-            <tr>
-              <th style={{ ...cornerCellStyle }}>
-                <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 700 }}>
-                  RONDA {session.current_round}
-                </div>
-                <div style={{ fontFamily: fonts.display, fontSize: 30, color: colors.accentLight }}>
-                  {session.current_letter}
-                </div>
-              </th>
-              {categories.map((c) => (
-                <th key={c.key} style={headCellStyle}>
-                  {c.label}
-                </th>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', maxWidth: 1100, minWidth: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minHeight: 44 }}>
+        {writing && (
+          <>
+            <div style={{ fontSize: 14, color: colors.accentLight, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Completá todas las categorías
+            </div>
+            <div style={{ display: 'flex', gap: 16, fontSize: 12, color: colors.textMuted, flexWrap: 'wrap', justifyContent: 'center' }}>
+              {players.map((p) => (
+                <span key={p.id}>
+                  {p.nickname}: {submittedCount[p.player_id] ?? 0}/{categories.length}
+                </span>
               ))}
-              <th style={{ ...headCellStyle, width: 90 }}>Ronda</th>
-              <th style={{ ...headCellStyle, width: 90 }}>Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((player) => {
-              const isMe = player.player_id === userId;
-              return (
-                <tr key={player.id}>
-                  <td style={playerCellStyle}>{player.nickname}</td>
-                  {categories.map((c) => {
-                    const row = isMe
-                      ? myAnswers[c.key]
-                      : answers.find(
-                          (a) => a.player_id === player.player_id && a.category_key === c.key && a.round === session.current_round
-                        );
+            </div>
+          </>
+        )}
+        {session.status === 'round_grace' && (
+          <div style={{ fontSize: 14, color: colors.warning, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            ¡Basta de {playerLabel(session.basta_player_id ?? '')}! Se corta en {graceLeft}s
+          </div>
+        )}
+        {voting && (
+          <div style={{ fontSize: 14, color: colors.warning, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Voten cada respuesta — único = 10, repetida = 5, inválida = 0
+          </div>
+        )}
+        {(session.status === 'round_results' || session.status === 'finished') && (
+          <div style={{ fontSize: 14, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Resultados de la ronda
+          </div>
+        )}
+      </div>
 
-                    if (session.status === 'round_active' || session.status === 'round_grace') {
-                      if (isMe) {
-                        return (
-                          <td key={c.key} style={bodyCellStyle}>
-                            <input
-                              value={draft[c.key] ?? ''}
-                              onChange={(e) => handleAnswerChange(c.key, e.target.value)}
-                              onBlur={() => handleAnswerBlur(c.key)}
-                              placeholder={session.current_letter ?? ''}
-                              style={inputStyle}
-                            />
-                          </td>
-                        );
-                      }
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        style={
+          expanded
+            ? {
+                position: 'fixed',
+                top: 12,
+                right: 12,
+                zIndex: 61,
+                padding: '8px 16px',
+                background: colors.accent,
+                border: 'none',
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                cursor: 'pointer',
+              }
+            : {
+                alignSelf: 'flex-end',
+                padding: '6px 14px',
+                background: 'none',
+                border: `1px solid ${colors.borderStrong}`,
+                color: colors.textSecondary,
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                cursor: 'pointer',
+              }
+        }
+      >
+        {expanded ? '✕ Salir de pantalla completa' : '⛶ Pantalla completa'}
+      </button>
+
+      <div
+        key={expanded ? 'full' : 'normal'}
+        style={
+          expanded
+            ? {
+                position: 'fixed',
+                inset: 0,
+                zIndex: 60,
+                overflow: 'auto',
+                padding: '56px 16px 16px',
+                boxSizing: 'border-box',
+                background: colors.bg,
+              }
+            : {
+                width: '100%',
+                maxWidth: '100%',
+                overflowX: 'auto',
+                border: `1px solid ${colors.accent}`,
+                background: colors.surface,
+              }
+        }
+      >
+        <div style={{ width: sheetWidth, zoom: fitScale }}>
+          <div style={{ display: 'grid', gridTemplateColumns: columns, background: 'rgba(47,174,76,0.1)' }}>
+            <div style={{ ...cell, ...pinned, ...headerCorner }}>
+              <span style={{ fontSize: 11, color: colors.textMuted, fontWeight: 700 }}>RONDA {session.current_round}</span>
+              <span style={{ fontFamily: fonts.display, fontSize: 34, color: colors.accentLight, lineHeight: 1 }}>
+                {session.current_letter}
+              </span>
+            </div>
+            {categories.map((c) => (
+              <div key={c.key} style={{ ...cell, ...categoryHeader }}>
+                <span style={{ fontSize: 16 }}>{c.icon}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.3, lineHeight: 1.25 }}>
+                  {c.label}
+                </span>
+              </div>
+            ))}
+            <div style={{ ...cell, ...totalHeader }}>Ronda</div>
+            <div style={{ ...cell, ...totalHeader }}>Total</div>
+          </div>
+
+          {players.map((player) => {
+            const isMe = player.player_id === userId;
+            return (
+              <div key={player.id} style={{ display: 'grid', gridTemplateColumns: columns, borderTop: `1px solid ${colors.border}` }}>
+                <div style={{ ...cell, ...pinned, ...playerLabelCell }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: '#fff', textTransform: 'uppercase' }}>
+                    {isMe ? `${player.nickname} (vos)` : player.nickname}
+                  </span>
+                  {player.player_id === session.host_id && (
+                    <span style={{ fontSize: 10, color: colors.accentLight, textTransform: 'uppercase' }}>Host 👑</span>
+                  )}
+                </div>
+
+                {categories.map((c) => {
+                  const row = isMe
+                    ? myAnswers[c.key]
+                    : answers.find(
+                        (a) => a.player_id === player.player_id && a.category_key === c.key && a.round === session.current_round
+                      );
+
+                  if (writing) {
+                    if (isMe) {
                       return (
-                        <td key={c.key} style={bodyCellStyle}>
-                          <span style={{ color: colors.textMuted }}>{row?.answer ? '●●●' : '…'}</span>
-                        </td>
+                        <div key={c.key} style={{ ...cell, ...answerCell }}>
+                          <input
+                            value={draft[c.key] ?? ''}
+                            onChange={(e) => handleAnswerChange(c.key, e.target.value)}
+                            onBlur={() => handleAnswerBlur(c.key)}
+                            placeholder={session.current_letter ?? ''}
+                            style={inputStyle}
+                          />
+                        </div>
                       );
                     }
-
-                    if (voting) {
-                      const blank = !row || !row.answer.trim();
-                      if (blank) {
-                        return (
-                          <td key={c.key} style={bodyCellStyle}>
-                            <span style={{ color: colors.textMuted }}>Vacío</span>
-                          </td>
-                        );
-                      }
-                      const hint = hints[row.id];
-                      const dupGroup = duplicateGroups.get(`${c.key}|${row.answer.trim().toLowerCase()}`) ?? [];
-                      const others = dupGroup.filter((d) => d.player_id !== player.player_id).map((d) => playerLabel(d.player_id));
-                      const active = verdictFromRow(row);
-                      return (
-                        <td key={c.key} style={bodyCellStyle}>
-                          <div style={{ fontWeight: 700, color: '#fff', textTransform: 'uppercase', fontSize: 13 }}>{row.answer}</div>
-                          {hint && (
-                            <div style={{ fontSize: 10, color: hint.valid ? colors.accentLight : colors.textMuted, marginTop: 2 }}>
-                              {hint.valid ? '💡 parece real' : '💡 no se encontró'}
-                            </div>
-                          )}
-                          {others.length > 0 && (
-                            <div style={{ fontSize: 10, color: colors.warning, marginTop: 2 }}>coincide con {others.join(', ')}</div>
-                          )}
-                          {isMe ? (
-                            <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 6 }}>Lo votan los demás</div>
-                          ) : (
-                            <VerdictButtons active={active} onPick={(v) => handleVerdict(row.id, v)} />
-                          )}
-                        </td>
-                      );
-                    }
-
-                    // round_results / finished
                     return (
-                      <td key={c.key} style={bodyCellStyle}>
-                        <span
-                          style={{
-                            color: row?.is_valid ? colors.accentLight : row?.invalid_reason === 'empty' ? colors.textMuted : colors.danger,
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {row?.answer || '—'}
-                        </span>
-                        {row && <div style={{ fontSize: 11, color: colors.textMuted }}>{resultLabel(row)}</div>}
-                      </td>
+                      <div key={c.key} style={{ ...cell, ...answerCell }}>
+                        <span style={{ color: colors.textMuted, letterSpacing: 2 }}>{row?.answer?.trim() ? '●●●' : '…'}</span>
+                      </div>
                     );
-                  })}
-                  <td style={{ ...bodyCellStyle, fontFamily: fonts.display, fontSize: 20, color: colors.textSecondary }}>
-                    {pointsPending ? '—' : roundPoints[player.player_id] ?? 0}
-                  </td>
-                  <td style={{ ...bodyCellStyle, fontFamily: fonts.display, fontSize: 20, color: colors.accentLight }}>
-                    {player.total_score}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  }
+
+                  if (voting) {
+                    if (!row || !row.answer.trim()) {
+                      return (
+                        <div key={c.key} style={{ ...cell, ...answerCell }}>
+                          <span style={{ color: colors.textMuted }}>Vacío</span>
+                        </div>
+                      );
+                    }
+                    const hint = hints[row.id];
+                    const dupGroup = duplicateGroups.get(`${c.key}|${row.answer.trim().toLowerCase()}`) ?? [];
+                    const others = dupGroup.filter((d) => d.player_id !== player.player_id).map((d) => playerLabel(d.player_id));
+                    return (
+                      <div key={c.key} style={{ ...cell, ...answerCell }}>
+                        <div style={{ fontWeight: 800, color: '#fff', textTransform: 'uppercase', fontSize: 14, wordBreak: 'break-word' }}>
+                          {row.answer}
+                        </div>
+                        {hint && (
+                          <div style={{ fontSize: 11, color: hint.valid ? colors.accentLight : colors.textMuted }}>
+                            {hint.valid ? '💡 parece real' : '💡 no se encontró'}
+                          </div>
+                        )}
+                        {others.length > 0 && (
+                          <div style={{ fontSize: 11, color: colors.warning }}>coincide con {others.join(', ')}</div>
+                        )}
+                        {isMe ? (
+                          <div style={{ fontSize: 11, color: colors.textMuted }}>Lo votan los demás</div>
+                        ) : (
+                          <VerdictButtons active={verdictFromRow(row)} onPick={(v) => handleVerdict(row.id, v)} />
+                        )}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={c.key} style={{ ...cell, ...answerCell }}>
+                      <span
+                        style={{
+                          color: row?.is_valid ? colors.accentLight : row?.invalid_reason === 'empty' ? colors.textMuted : colors.danger,
+                          fontWeight: 800,
+                          textTransform: 'uppercase',
+                          wordBreak: 'break-word',
+                        }}
+                      >
+                        {row?.answer || '—'}
+                      </span>
+                      {row && <div style={{ fontSize: 11, color: colors.textMuted }}>{resultLabel(row)}</div>}
+                    </div>
+                  );
+                })}
+
+                <div style={{ ...cell, ...totalValue, color: colors.textSecondary }}>
+                  {pointsPending ? '—' : roundPoints[player.player_id] ?? 0}
+                </div>
+                <div style={{ ...cell, ...totalValue, color: colors.accentLight }}>{player.total_score}</div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {session.status === 'round_active' && (
@@ -385,17 +485,19 @@ function VerdictButtons({ active, onPick }: { active: TuttiVerdict | null; onPic
     { verdict: 'invalid', label: '✗', title: 'Inválida' },
   ];
   return (
-    <div style={{ display: 'flex', gap: 4, marginTop: 6, justifyContent: 'center' }}>
+    <div style={{ display: 'flex', gap: 4, marginTop: 4, width: '100%', boxSizing: 'border-box' }}>
       {options.map((o) => (
         <button
           key={o.verdict}
           title={o.title}
           onClick={() => onPick(o.verdict)}
           style={{
-            padding: '3px 8px',
-            fontSize: 11,
+            flex: 1,
+            minWidth: 0,
+            padding: '6px 0',
+            fontSize: 13,
             fontWeight: 800,
-            border: `1px solid ${active === o.verdict ? colors.accentLight : 'rgba(255,255,255,0.2)'}`,
+            border: `1px solid ${active === o.verdict ? colors.accentLight : colors.borderStrong}`,
             background: active === o.verdict ? colors.accent : 'transparent',
             color: '#fff',
             cursor: 'pointer',
@@ -408,57 +510,81 @@ function VerdictButtons({ active, onPick }: { active: TuttiVerdict | null; onPic
   );
 }
 
-
-const cornerCellStyle: CSSProperties = {
-  padding: '10px 14px',
-  border: GRID_LINE,
-  background: 'rgba(47,174,76,0.1)',
+const cell: CSSProperties = {
+  padding: '12px 12px',
+  borderLeft: `1px solid ${colors.border}`,
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  gap: 4,
   textAlign: 'center',
-  verticalAlign: 'middle',
+  minHeight: 96,
+  boxSizing: 'border-box',
+  minWidth: 0,
 };
 
-const headCellStyle: CSSProperties = {
-  padding: '10px 8px',
+const pinned: CSSProperties = {
+  position: 'sticky',
+  left: 0,
+  zIndex: 1,
+  background: '#0f0f11',
+  borderLeft: 'none',
+};
+
+const headerCorner: CSSProperties = {
+  alignItems: 'center',
+  minHeight: 64,
+  zIndex: 2,
+  background: '#0f0f11',
+};
+
+const categoryHeader: CSSProperties = {
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(255,255,255,0.03)',
+  minHeight: 64,
+};
+
+const totalHeader: CSSProperties = {
+  alignItems: 'center',
+  justifyContent: 'center',
   fontSize: 11,
   fontWeight: 800,
-  color: colors.textSecondary,
+  color: colors.textMuted,
   textTransform: 'uppercase',
-  letterSpacing: 0.3,
-  border: GRID_LINE,
-  background: 'rgba(255,255,255,0.03)',
-  textAlign: 'center',
+  minHeight: 64,
 };
 
-const playerCellStyle: CSSProperties = {
-  padding: '14px 16px',
+const playerLabelCell: CSSProperties = {
+  alignItems: 'flex-start',
+  justifyContent: 'center',
+  padding: '14px 14px',
+};
+
+const answerCell: CSSProperties = {
+  alignItems: 'center',
+  justifyContent: 'center',
   fontSize: 14,
-  fontWeight: 800,
-  color: '#fff',
-  textTransform: 'uppercase',
-  border: GRID_LINE,
-  background: 'rgba(255,255,255,0.03)',
-  textAlign: 'left',
 };
 
-const bodyCellStyle: CSSProperties = {
-  padding: '10px 10px',
-  fontSize: 13,
-  border: GRID_LINE,
-  verticalAlign: 'middle',
-  textAlign: 'center',
+const totalValue: CSSProperties = {
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontFamily: fonts.display,
+  fontSize: 26,
 };
 
 const inputStyle: CSSProperties = {
   width: '100%',
-  padding: '6px 4px',
-  background: 'transparent',
-  border: 'none',
-  borderBottom: '2px solid rgba(255,255,255,0.2)',
+  padding: '8px 6px',
+  background: 'rgba(255,255,255,0.04)',
+  border: `1px solid ${colors.borderFaint}`,
   color: '#fff',
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 700,
   textAlign: 'center',
   textTransform: 'uppercase',
+  boxSizing: 'border-box',
 };
 
 const bastaButtonStyle: CSSProperties = {

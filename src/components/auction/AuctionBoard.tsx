@@ -100,7 +100,7 @@ export function AuctionBoard({
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: 1180, padding: '0 16px', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', maxWidth: 1180, padding: '16px', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <div style={{ fontFamily: fonts.display, fontSize: 22, color: '#fff', textTransform: 'uppercase' }}>
           Lote {round} <span style={{ color: colors.textMuted }}>/ {roundsTotal}</span>
@@ -183,7 +183,7 @@ export function AuctionBoard({
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minWidth: 300, maxWidth: 520 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minWidth: 'min(300px, 100%)', maxWidth: 520 }}>
           <div style={{ ...panelStyle, gap: 8, padding: 12 }}>
             {clues.map((clue, i) => {
               const shown = i < revealedCount;

@@ -30,6 +30,8 @@ export interface BoardReveal {
 }
 
 interface AuctionBoardProps {
+  /** no written clues: the silhouette is all there is */
+  hideClues?: boolean;
   phase: 'bidding' | 'reveal';
   round: number;
   roundsTotal: number;
@@ -57,6 +59,7 @@ function silhouetteFilter(cluesShown: number): string {
 }
 
 export function AuctionBoard({
+  hideClues = false,
   phase,
   round,
   roundsTotal,
@@ -185,7 +188,12 @@ export function AuctionBoard({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minWidth: 'min(300px, 100%)', maxWidth: 520 }}>
           <div style={{ ...panelStyle, gap: 8, padding: 12 }}>
-            {clues.map((clue, i) => {
+            {hideClues && bidding && (
+              <div style={{ textAlign: 'center', padding: '14px 8px', fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>
+                Modo silueta: sin pistas escritas. La imagen se aclara con el tiempo.
+              </div>
+            )}
+            {(!hideClues || !bidding) && clues.map((clue, i) => {
               const shown = i < revealedCount;
               const untilMs = AUCTION.clueAtMs[i] - elapsedMs;
               return (

@@ -58,6 +58,41 @@ export const HEAD_SOCCER_ONLINE = {
   staleAfterMs: 5000,
 };
 
+export const STREET = {
+  matchSeconds: 180,
+  targetGoals: 5,
+  /** px/s */
+  speed: 150,
+  accel: 9,
+  /** the ball carrier is a bit slower than a free runner */
+  carrierSlow: 0.92,
+  /** gambeta: a short burst of speed during which nobody can take the ball */
+  trickMs: 380,
+  trickCooldownMs: 1100,
+  trickBoost: 1.7,
+  shotPower: 640,
+  passPowerMin: 300,
+  passPowerMax: 470,
+  /** a ball faster than this is blocked by a player instead of caught */
+  catchMaxSpeed: 500,
+  ballFriction: 1.1,
+  wallBounce: 0.8,
+  /** a player who just kicked can't pick the ball straight back up */
+  kickPickupCdMs: 280,
+  tackledPickupCdMs: 500,
+  /** after losing the ball a player can't tackle back for this long */
+  tackleLockMs: 900,
+  goalPauseMs: 1700,
+  /** the controlled player only switches when another one is this much closer to the ball */
+  switchHysteresisPx: 16,
+  humanAimError: 0,
+  difficulty: {
+    easy: { speed: 0.85, aimErr: 120, tackleMs: 440, decisionMs: 650, shootRange: 300 },
+    normal: { speed: 0.95, aimErr: 70, tackleMs: 310, decisionMs: 450, shootRange: 340 },
+    hard: { speed: 1.05, aimErr: 45, tackleMs: 220, decisionMs: 300, shootRange: 380 },
+  },
+};
+
 export const AUCTION = {
   /** how long one lot can be bid on */
   bidWindowMs: 20_000,
@@ -75,6 +110,8 @@ export const AUCTION = {
   legendChance: 0.35,
   /** "Rápida" match length as a share of a full XI per player */
   shortModeFactor: 0.6,
+  /** total players on offer in the bigger modes (never fewer than a full XI each) */
+  poolSizes: { big: 30, max: 40 },
   budgetPresets: [100, 200, 300, 500],
   defaultBudget: 200,
   budgetMin: 10,

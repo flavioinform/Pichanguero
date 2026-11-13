@@ -13,7 +13,7 @@ import {
 } from '../../lib/auctionSession';
 import { fetchAuctionLotsByIds } from '../../lib/auctionData';
 import { highestBid, type AuctionBid, type AuctionLot } from '../../lib/auctionEngine';
-import { DEFAULT_FORMATION_ID, assignToXi, getFormation, hasFreeSlot, type Xi } from '../../lib/auctionFormations';
+import { DEFAULT_FORMATION_ID, assignToXi, getFormation, hasFreeSlot, type LotsMode, type Xi } from '../../lib/auctionFormations';
 import { AuctionBoard, type BoardBid, type BoardReveal } from './AuctionBoard';
 import { AuctionResult } from './AuctionResult';
 import { AuctionSettings } from './AuctionSettings';
@@ -37,6 +37,13 @@ interface AuctionOnlineScreenProps {
 
 type View = 'choose' | 'config' | 'join';
 
+const LOTS_MODE_LABEL: Record<LotsMode, string> = {
+  full: 'once completo',
+  short: 'rápida',
+  big: '30 jugadores',
+  max: '40 jugadores',
+};
+
 export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
   const { userId, nickname, loading: authLoading, setNickname } = useAuth();
   const [view, setView] = useState<View>('choose');
@@ -44,7 +51,8 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [budget, setBudget] = useState(AUCTION.defaultBudget);
   const [formationId, setFormationId] = useState(DEFAULT_FORMATION_ID);
-  const [lotsMode, setLotsMode] = useState<'full' | 'short'>('full');
+  const [lotsMode, setLotsMode] = useState<LotsMode>('full');
+  const [hideClues, setHideClues] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -100,28 +108,6 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
     finalizeAuctionRound(session).catch((err) => setErrorMsg(err instanceof Error ? err.message : 'No se pudo cerrar la ronda.'));
   }, [isHost, session, status, now, roundStartMs, round]);
 
-  // Host moves on after the reveal has been on screen for a while.
-  useEffect(() => {
-    if (status !== 'reveal') {
-      revealSeenAt.current = 0;
-      return;
-    }
-    if (!revealSeenAt.current) revealSeenAt.current = Date.now();
-    if (!isHost || !session) return;
-    if (now - revealSeenAt.current < AUCTION.revealMs) return;
-    if (advancedRound.current === round) return;
-    advancedRound.current = round;
-    advanceAuction(session).catch((err) => setErrorMsg(err instanceof Error ? err.message : 'No se pudo avanzar.'));
-  }, [isHost, session, status, now, round]);
-
-  const nameOf = (playerId: string) => players.find((p) => p.player_id === playerId)?.nickname ?? '—';
-  const me = players.find((p) => p.player_id === userId);
-
-  const roundBids: AuctionBid[] = useMemo(
-    () => bids.filter((b) => b.round === round).map(bidRowToBid),
-    [bids, round]
-  );
-
   // Each player's XI, rebuilt from the recorded results in round order so
   // every client puts the same player in the same slot.
   const xis = useMemo(() => {
@@ -133,6 +119,32 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
     }
     return out;
   }, [players, results, lotsById, formation]);
+
+  // with a 30 or 40 player pool there are lots to spare: stop once every XI is full
+  const everyoneComplete =
+    players.length > 0 && players.every((p) => Object.keys(xis[p.player_id] ?? {}).length >= formation.slots.length);
+
+  // Host moves on after the reveal has been on screen for a while.
+  useEffect(() => {
+    if (status !== 'reveal') {
+      revealSeenAt.current = 0;
+      return;
+    }
+    if (!revealSeenAt.current) revealSeenAt.current = Date.now();
+    if (!isHost || !session) return;
+    if (now - revealSeenAt.current < AUCTION.revealMs) return;
+    if (advancedRound.current === round) return;
+    advancedRound.current = round;
+    advanceAuction(session, everyoneComplete).catch((err) => setErrorMsg(err instanceof Error ? err.message : 'No se pudo avanzar.'));
+  }, [isHost, session, status, now, round, everyoneComplete]);
+
+  const nameOf = (playerId: string) => players.find((p) => p.player_id === playerId)?.nickname ?? '—';
+  const me = players.find((p) => p.player_id === userId);
+
+  const roundBids: AuctionBid[] = useMemo(
+    () => bids.filter((b) => b.round === round).map(bidRowToBid),
+    [bids, round]
+  );
 
   const [bidAlert, setBidAlert] = useState<string | null>(null);
   const lastBidId = useRef<string | null>(null);
@@ -168,7 +180,7 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
     setBusy(true);
     setErrorMsg(null);
     try {
-      const created = await createAuctionSession(nickname!, { budget, formation: formationId, lotsMode });
+      const created = await createAuctionSession(nickname!, { budget, formation: formationId, lotsMode, hideClues });
       setSessionId(created.id);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'No se pudo crear la sala.');
@@ -290,6 +302,7 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
             </div>
           )}
           <AuctionBoard
+            hideClues={session.hide_clues ?? false}
             phase={session.status}
             round={round}
             roundsTotal={session.rounds_total}
@@ -313,7 +326,7 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
             bidError={bidError}
             reveal={reveal}
             revealCountdown={isHost ? revealLeft : null}
-            onNext={isHost && session ? () => advanceAuction(session).catch(() => {}) : null}
+            onNext={isHost && session ? () => advanceAuction(session, everyoneComplete).catch(() => {}) : null}
             onExit={onBack}
           />
           {errorMsg && <ErrorText text={errorMsg} />}
@@ -340,7 +353,7 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
             {session.join_code}
           </div>
           <span style={{ fontSize: 13, color: colors.textSecondary }}>
-            {session.formation} · {session.budget}M de presupuesto · {session.lots_mode === 'full' ? 'once completo' : 'rápida'}
+            {session.formation} · {session.budget}M de presupuesto · {LOTS_MODE_LABEL[session.lots_mode] ?? 'once completo'}{session.hide_clues ? ' · solo silueta' : ''}
           </span>
         </div>
 
@@ -403,6 +416,8 @@ export function AuctionOnlineScreen({ onBack }: AuctionOnlineScreenProps) {
           onBudgetChange={setBudget}
           onFormationChange={setFormationId}
           onLotsModeChange={setLotsMode}
+          hideClues={hideClues}
+          onHideCluesChange={setHideClues}
         />
         {errorMsg && <ErrorText text={errorMsg} />}
         <PrimaryButton label={busy ? 'Creando…' : 'Crear sala'} disabled={busy} onClick={handleCreate} />

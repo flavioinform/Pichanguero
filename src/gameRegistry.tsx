@@ -7,6 +7,7 @@ import { CareerScreen } from './components/career/CareerScreen';
 import { HeadSoccerScreen } from './components/headsoccer/HeadSoccerScreen';
 import { WordleScreen } from './components/wordle/WordleScreen';
 import { AuctionScreen } from './components/auction/AuctionScreen';
+import { StreetScreen } from './components/street/StreetScreen';
 
 export interface GameScreenProps {
   onBack: () => void;
@@ -22,6 +23,7 @@ export const SCREEN_BY_GAME_ID: Record<string, GameScreen> = {
   headsoccer: 'headsoccer',
   adivina: 'wordle',
   auction: 'auction',
+  street: 'street',
 };
 
 /** The component behind each game screen. Typed as a full Record so adding
@@ -34,6 +36,7 @@ export const SCREEN_COMPONENTS: Record<GameScreen, ComponentType<GameScreenProps
   headsoccer: HeadSoccerScreen,
   wordle: WordleScreen,
   auction: AuctionScreen,
+  street: StreetScreen,
 };
 
 export function isGameScreen(screen: string): screen is GameScreen {

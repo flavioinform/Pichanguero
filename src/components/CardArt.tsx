@@ -34,6 +34,7 @@ const GLOW: Record<IconKey, { cx: string; cy: string; r: string; stop: string }>
   career: { cx: '50%', cy: '40%', r: '55%', stop: '#1d2a3a' },
   headsoccer: { cx: '50%', cy: '40%', r: '55%', stop: '#173a20' },
   auction: { cx: '50%', cy: '40%', r: '55%', stop: '#3a2f17' },
+  street: { cx: '50%', cy: '42%', r: '55%', stop: '#2b2f36' },
 };
 
 export function CardArt({ iconKey }: { iconKey: IconKey }) {
@@ -88,7 +89,21 @@ const LINE_ART: Record<IconKey, ComponentType> = {
   career: CareerArt,
   headsoccer: HeadSoccerArt,
   auction: AuctionArt,
+  street: StreetArt,
 };
+
+function StreetArt() {
+  return (
+    <g fill="none" stroke="#4cd964" strokeWidth={2.4} strokeLinecap="round">
+      <rect x={24} y={90} width={152} height={130} rx={6} />
+      <line x1={100} y1={90} x2={100} y2={220} />
+      <circle cx={100} cy={155} r={22} />
+      <rect x={24} y={128} width={14} height={54} />
+      <rect x={162} y={128} width={14} height={54} />
+      <circle cx={100} cy={155} r={7} fill="#4cd964" stroke="none" />
+    </g>
+  );
+}
 
 function LineArt({ iconKey }: { iconKey: IconKey }) {
   const Art = LINE_ART[iconKey];

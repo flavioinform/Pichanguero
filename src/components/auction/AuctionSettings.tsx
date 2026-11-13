@@ -1,17 +1,19 @@
 import type { ReactNode } from 'react';
 import { colors, fonts } from '../../theme';
-import { FORMATIONS, getFormation, lotsPerGroup } from '../../lib/auctionFormations';
+import { FORMATIONS, getFormation, lotsPerGroup, type LotsMode } from '../../lib/auctionFormations';
 import { AUCTION } from '../../config/gameConfig';
 
 interface AuctionSettingsProps {
   budget: number;
   formationId: string;
-  lotsMode: 'full' | 'short';
+  lotsMode: LotsMode;
   /** how many people are bidding, to size the match (2 for vs CPU) */
   participants: number;
   onBudgetChange: (budget: number) => void;
   onFormationChange: (id: string) => void;
-  onLotsModeChange: (mode: 'full' | 'short') => void;
+  onLotsModeChange: (mode: LotsMode) => void;
+  hideClues: boolean;
+  onHideCluesChange: (hide: boolean) => void;
 }
 
 /** Formation, budget (presets or any value from 10 to 1000) and match
@@ -24,6 +26,8 @@ export function AuctionSettings({
   onBudgetChange,
   onFormationChange,
   onLotsModeChange,
+  hideClues,
+  onHideCluesChange,
 }: AuctionSettingsProps) {
   const formation = getFormation(formationId);
   const lots = Object.values(lotsPerGroup(formation, participants, lotsMode)).reduce((a, b) => a + b, 0);
@@ -75,6 +79,24 @@ export function AuctionSettings({
         </Pill>
         <Pill selected={lotsMode === 'short'} onClick={() => onLotsModeChange('short')}>
           Rápida
+        </Pill>
+        <Pill selected={lotsMode === 'big'} onClick={() => onLotsModeChange('big')}>
+          {`${AUCTION.poolSizes.big} jugadores`}
+        </Pill>
+        <Pill selected={lotsMode === 'max'} onClick={() => onLotsModeChange('max')}>
+          {`${AUCTION.poolSizes.max} jugadores`}
+        </Pill>
+      </Group>
+
+      <Group
+        label="Datos de los jugadores"
+        hint={hideClues ? 'Sin pistas escritas: solo la silueta, que se aclara con el tiempo' : 'Posición, origen, club y trayectoria van apareciendo'}
+      >
+        <Pill selected={!hideClues} onClick={() => onHideCluesChange(false)}>
+          Mostrar datos
+        </Pill>
+        <Pill selected={hideClues} onClick={() => onHideCluesChange(true)}>
+          Solo silueta
         </Pill>
       </Group>
     </div>

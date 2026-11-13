@@ -7,6 +7,7 @@ import {
   getFormation,
   hasFreeSlot,
   lotsPerGroup,
+  type LotsMode,
   type Xi,
 } from '../../lib/auctionFormations';
 import { AuctionBoard, type BoardBid, type BoardReveal } from './AuctionBoard';
@@ -43,7 +44,8 @@ export function AuctionOfflineScreen({ onBack }: AuctionOfflineScreenProps) {
   const [stage, setStage] = useState<Stage>('setup');
   const [budget, setBudget] = useState(AUCTION.defaultBudget);
   const [formationId, setFormationId] = useState(DEFAULT_FORMATION_ID);
-  const [lotsMode, setLotsMode] = useState<'full' | 'short'>('full');
+  const [lotsMode, setLotsMode] = useState<LotsMode>('full');
+  const [hideClues, setHideClues] = useState(false);
   const [game, setGame] = useState<Game | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [bidError, setBidError] = useState<string | null>(null);
@@ -219,6 +221,8 @@ export function AuctionOfflineScreen({ onBack }: AuctionOfflineScreenProps) {
           onBudgetChange={setBudget}
           onFormationChange={setFormationId}
           onLotsModeChange={setLotsMode}
+          hideClues={hideClues}
+          onHideCluesChange={setHideClues}
         />
         <PrimaryButton label="Empezar subasta" onClick={startMatch} />
         <SecondaryButton label="Volver" onClick={onBack} />
@@ -257,6 +261,7 @@ export function AuctionOfflineScreen({ onBack }: AuctionOfflineScreenProps) {
   return (
     <div style={{ position: 'relative', zIndex: 2, width: '100%', height: '100%', display: 'flex', alignItems: 'safe center', justifyContent: 'center', overflowY: 'auto' }}>
       <AuctionBoard
+        hideClues={hideClues}
         phase={game.phase}
         round={game.roundIdx + 1}
         roundsTotal={game.lots.length}

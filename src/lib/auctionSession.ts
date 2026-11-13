@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient';
 import { generateJoinCode } from './joinCode';
 import { fetchFormationLots, fetchAuctionLotsByIds } from './auctionData';
 import { highestBid, settleLot, type AuctionBid } from './auctionEngine';
-import { getFormation, lotsPerGroup } from './auctionFormations';
+import { getFormation, lotsPerGroup, type LotsMode } from './auctionFormations';
 
 export type AuctionStatus = 'waiting' | 'bidding' | 'reveal' | 'finished';
 
@@ -13,7 +13,9 @@ export interface AuctionSessionRow {
   status: AuctionStatus;
   budget: number;
   formation: string;
-  lots_mode: 'full' | 'short';
+  lots_mode: LotsMode;
+  /** true: no written clues, only the silhouette (column added in migration 0021) */
+  hide_clues?: boolean;
   /** 0 until the host starts the auction and the lots are drawn */
   rounds_total: number;
   max_players: number;
@@ -68,7 +70,8 @@ async function requireUser() {
 export interface CreateAuctionOptions {
   budget: number;
   formation: string;
-  lotsMode: 'full' | 'short';
+  lotsMode: LotsMode;
+  hideClues?: boolean;
 }
 
 export async function createAuctionSession(nickname: string, options: CreateAuctionOptions): Promise<AuctionSessionRow> {
@@ -84,6 +87,8 @@ export async function createAuctionSession(nickname: string, options: CreateAuct
         budget: options.budget,
         formation: options.formation,
         lots_mode: options.lotsMode,
+        // only sent when on, so rooms still work before migration 0021 is applied
+        ...(options.hideClues ? { hide_clues: true } : {}),
       })
       .select()
       .single();
@@ -237,11 +242,11 @@ export async function finalizeAuctionRound(session: AuctionSessionRow): Promise<
 }
 
 /** Host-only: moves from the reveal screen to the next lot, or ends the match. */
-export async function advanceAuction(session: AuctionSessionRow): Promise<void> {
+export async function advanceAuction(session: AuctionSessionRow, everyoneComplete = false): Promise<void> {
   const user = await requireUser();
   if (user.id !== session.host_id) throw new Error('Solo el anfitrión puede avanzar.');
 
-  const isLast = session.current_round >= session.rounds_total;
+  const isLast = session.current_round >= session.rounds_total || everyoneComplete;
   const update = isLast
     ? { status: 'finished' }
     : { status: 'bidding', current_round: session.current_round + 1, round_started_at: new Date().toISOString() };

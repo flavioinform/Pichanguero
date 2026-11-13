@@ -59,6 +59,16 @@ export function GameIcon({ iconKey, size, color, strokeWidth = 1.4 }: GameIconPr
     );
   }
 
+  if (iconKey === 'street') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round">
+        <rect x="2.5" y="5" width="19" height="14" rx="1.5" />
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <circle cx="12" cy="12" r="2.6" />
+      </svg>
+    );
+  }
+
   if (iconKey === 'auction') {
     return (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round">

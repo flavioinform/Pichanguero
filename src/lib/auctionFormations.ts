@@ -151,17 +151,34 @@ export function assignToXi(formation: Formation, xi: Xi, lot: AuctionLot): Xi {
   return { ...xi, [target.id]: lot };
 }
 
-/** How many lots to draw per position: a full XI for every participant, or
- * a shorter ~60% version that leaves some slots empty. */
+export type LotsMode = 'full' | 'short' | 'big' | 'max';
+
+/** How many lots to draw per position: a full XI for every participant, a
+ * shorter ~60% version that leaves some slots empty, or a bigger pool (30 or
+ * 40 players) where everyone can pick and choose who to buy. */
 export function lotsPerGroup(
   formation: Formation,
   participants: number,
-  mode: 'full' | 'short'
+  mode: LotsMode
 ): Record<PositionGroup, number> {
   const base = slotCounts(formation);
-  const factor = mode === 'full' ? 1 : AUCTION.shortModeFactor;
+  const groups = Object.keys(base) as PositionGroup[];
+  const fullTotal = groups.reduce((sum, g) => sum + base[g] * participants, 0);
   const result = { ...base };
-  (Object.keys(base) as PositionGroup[]).forEach((g) => {
+
+  if (mode === 'big' || mode === 'max') {
+    const target = Math.max(fullTotal, AUCTION.poolSizes[mode]);
+    groups.forEach((g) => {
+      result[g] = Math.max(1, Math.round((base[g] * participants * target) / fullTotal));
+    });
+    // rounding can leave the pool a few short or long: settle it on the biggest group
+    const biggest = groups.reduce((a, b) => (result[b] > result[a] ? b : a));
+    result[biggest] += target - groups.reduce((sum, g) => sum + result[g], 0);
+    return result;
+  }
+
+  const factor = mode === 'full' ? 1 : AUCTION.shortModeFactor;
+  groups.forEach((g) => {
     result[g] = Math.max(1, Math.round(base[g] * participants * factor));
   });
   return result;

@@ -20,6 +20,10 @@ export interface StreetInput {
   pass: boolean;
   shoot: boolean;
   trick: boolean;
+  /** change to the teammate closest to the ball */
+  switch: boolean;
+  /** this human prefers to change player only by hand (the switch key), not automatically */
+  manualSwitch: boolean;
 }
 
 export interface StreetPlayer {
@@ -38,7 +42,21 @@ export interface StreetPlayer {
   tackleMs: number;
   /** just lost the ball: can't win it straight back for a moment */
   tackleLockMs: number;
+  /** on the floor after a caño: can't move, tackle or pick up the ball */
+  stunMs: number;
+  /** the current gambeta already put someone through a caño */
+  canoDone: boolean;
   aiMs: number;
+}
+
+export interface StreetPopup {
+  /** stable across network snapshots, so a label is only announced once */
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+  ms: number;
+  team: 0 | 1;
 }
 
 export interface StreetState {
@@ -46,8 +64,8 @@ export interface StreetState {
   ball: { x: number; y: number; vx: number; vy: number };
   /** index of the player carrying the ball, or -1 */
   holder: number;
-  /** index of the player the human controls */
-  controlled: number;
+  /** per team: index of the player its human controls, or -1 when the team is all CPU */
+  controlled: [number, number];
   score: [number, number];
   clockMs: number;
   phase: 'playing' | 'goal' | 'ended';
@@ -55,15 +73,41 @@ export interface StreetState {
   lastScorer: 0 | 1 | null;
   winner: 0 | 1 | 'draw' | null;
   difficulty: Difficulty;
-  /** false: every player is CPU-driven (used for simulations and demos) */
-  hasHuman: boolean;
+  /** which teams have a human at the controls (none: simulations and demos) */
+  humans: [boolean, boolean];
   targetGoals: number;
-  prev: StreetInput;
+  prev: [StreetInput, StreetInput];
   seed: number;
+  /** style meter per team, 0-100 */
+  style: [number, number];
+  /** time left in "Modo Crack" per team */
+  crackMs: [number, number];
+  popups: StreetPopup[];
+  /** per team: how long its human has been holding the shoot key */
+  chargeMs: [number, number];
+  popupSeq: number;
+  /** per team: time left before the automatic switch may take over again */
+  switchLockMs: [number, number];
+  /** false on an online guest: its copy only predicts, so it never scores a goal
+   * or ends the match by itself and shows no labels until the host confirms them */
+  authoritative: boolean;
+}
+
+/** Keys that act on a press (or, for the shot, on a release). A quick tap can
+ * start and end between two ticks, so presses are remembered until a tick has seen them. */
+export const TAP_KEYS = ['pass', 'shoot', 'trick', 'switch'] as const;
+export type TapKey = (typeof TAP_KEYS)[number];
+export type Taps = Partial<Record<TapKey, boolean>>;
+
+/** `input`, with every key that was pressed since the last tick counted as held for this one. */
+export function withTaps(input: StreetInput, taps: Taps): StreetInput {
+  const out = { ...input };
+  for (const key of TAP_KEYS) if (taps[key]) out[key] = true;
+  return out;
 }
 
 export function emptyStreetInput(): StreetInput {
-  return { left: false, right: false, up: false, down: false, pass: false, shoot: false, trick: false };
+  return { left: false, right: false, up: false, down: false, pass: false, shoot: false, trick: false, switch: false, manualSwitch: false };
 }
 
 const HOME: Array<[number, number]> = [
@@ -82,16 +126,23 @@ function newPlayer(team: 0 | 1, role: 0 | 1 | 2): StreetPlayer {
   return {
     x, y, vx: 0, vy: 0, team, role,
     fx: team === 0 ? 1 : -1, fy: 0,
-    trickMs: 0, trickCd: 0, pickupCd: 0, tackleMs: 0, tackleLockMs: 0, aiMs: 0,
+    trickMs: 0, trickCd: 0, pickupCd: 0, tackleMs: 0, tackleLockMs: 0, stunMs: 0, canoDone: false, aiMs: 0,
   };
 }
 
-export function createStreetState(difficulty: Difficulty, targetGoals: number, clockMs: number, hasHuman = true): StreetState {
+export function createStreetState(
+  difficulty: Difficulty,
+  targetGoals: number,
+  clockMs: number,
+  /** true: one human, on team 0. false: nobody. Or say it per team. */
+  humans: boolean | [boolean, boolean] = true
+): StreetState {
+  const teams: [boolean, boolean] = Array.isArray(humans) ? humans : [humans, false];
   return {
     players: [newPlayer(0, 0), newPlayer(0, 1), newPlayer(0, 2), newPlayer(1, 0), newPlayer(1, 1), newPlayer(1, 2)],
     ball: { x: COURT.w / 2, y: COURT.h / 2, vx: 0, vy: 0 },
     holder: 1,
-    controlled: 1,
+    controlled: [teams[0] ? 1 : -1, teams[1] ? 4 : -1],
     score: [0, 0],
     clockMs,
     phase: 'playing',
@@ -99,10 +150,17 @@ export function createStreetState(difficulty: Difficulty, targetGoals: number, c
     lastScorer: null,
     winner: null,
     difficulty,
-    hasHuman,
+    humans: teams,
     targetGoals,
-    prev: emptyStreetInput(),
+    prev: [emptyStreetInput(), emptyStreetInput()],
     seed: (Math.random() * 2 ** 31) | 0,
+    style: [0, 0],
+    crackMs: [0, 0],
+    popups: [],
+    chargeMs: [0, 0],
+    popupSeq: 0,
+    switchLockMs: [0, 0],
+    authoritative: true,
   };
 }
 
@@ -130,6 +188,26 @@ interface Intent {
   trick: boolean;
 }
 
+function popup(s: StreetState, team: 0 | 1, text: string, x: number, y: number): void {
+  if (!s.authoritative) return;
+  // stack on top of any label still showing nearby instead of overlapping it
+  let top = y - PLAYER_R - 14;
+  while (s.popups.some((q) => Math.abs(q.x - x) < 90 && Math.abs(q.y - top) < 20)) top -= 22;
+  s.popupSeq += 1;
+  s.popups.push({ id: s.popupSeq, text, x, y: top, ms: STREET.popupMs, team });
+}
+
+/** Adds style to a team; a full meter starts "Modo Crack" for that team. */
+function addStyle(s: StreetState, team: 0 | 1, amount: number): void {
+  if (s.crackMs[team] > 0) return;
+  s.style[team] = Math.max(0, Math.min(100, s.style[team] + amount));
+  if (s.style[team] >= 100) {
+    s.style[team] = 0;
+    s.crackMs[team] = STREET.crack.durationMs;
+    popup(s, team, '¡MODO CRACK!', COURT.w / 2, COURT.h / 2);
+  }
+}
+
 function goalX(team: 0 | 1): number {
   return team === 0 ? COURT.w : 0;
 }
@@ -138,7 +216,7 @@ function goalX(team: 0 | 1): number {
 function kickoff(s: StreetState, kickingTeam: 0 | 1): void {
   s.players.forEach((p) => {
     const [x, y] = homeOf(p.team, p.role);
-    Object.assign(p, { x, y, vx: 0, vy: 0, trickMs: 0, tackleMs: 0, tackleLockMs: 0, pickupCd: 0 });
+    Object.assign(p, { x, y, vx: 0, vy: 0, trickMs: 0, tackleMs: 0, tackleLockMs: 0, pickupCd: 0, stunMs: 0, canoDone: false });
     p.fx = p.team === 0 ? 1 : -1;
     p.fy = 0;
   });
@@ -192,15 +270,16 @@ function doPass(s: StreetState, i: number, aimX: number, aimY: number): void {
   const d = dist(p.x, p.y, tx, ty);
   const power = Math.min(STREET.passPowerMax, Math.max(STREET.passPowerMin, d * 1.6 + 200));
   kick(s, i, tx - p.x, ty - p.y, power);
-  if (p.team === 0) s.controlled = j;
+  if (s.humans[p.team]) s.controlled[p.team] = j;
 }
 
-function doShoot(s: StreetState, i: number, aimDy: number, aimError: number): void {
+function doShoot(s: StreetState, i: number, aimDy: number, aimError: number, power = 1): void {
   const p = s.players[i];
   const gx = goalX(p.team);
   const mid = (COURT.goalTop + COURT.goalBottom) / 2;
-  const ty = mid + aimDy * 55 + (rand(s) - 0.5) * aimError;
-  kick(s, i, gx - p.x, ty - p.y, STREET.shotPower);
+  const crack = s.crackMs[p.team] > 0;
+  const ty = mid + aimDy * 55 + (crack ? 0 : (rand(s) - 0.5) * aimError);
+  kick(s, i, gx - p.x, ty - p.y, STREET.shotPower * power * (crack ? STREET.crack.shotBoost : 1));
 }
 
 function aiIntent(s: StreetState, i: number): Intent {
@@ -223,7 +302,11 @@ function aiIntent(s: StreetState, i: number): Intent {
     [intent.dx, intent.dy] = unit(tx - p.x, ty - p.y);
     const inRange = Math.abs(gx - p.x) < cfg.shootRange;
     if (decide && inRange) intent.shoot = true;
-    else if (decide && near && dist(near.x, near.y, p.x, p.y) < 42) {
+    else if (near && p.trickCd <= 0 && dist(near.x, near.y, p.x, p.y) < 34 && rand(s) < 0.04) {
+      // go straight at the rival: a gambeta now is a caño
+      [intent.dx, intent.dy] = unit(near.x - p.x, near.y - p.y);
+      intent.trick = true;
+    } else if (decide && near && dist(near.x, near.y, p.x, p.y) < 42) {
       if (p.trickCd <= 0 && rand(s) < 0.6) intent.trick = true;
       else intent.pass = true;
     }
@@ -238,9 +321,17 @@ function aiIntent(s: StreetState, i: number): Intent {
     ty = p.role === 1 ? holderP.y - 110 : p.role === 2 ? holderP.y + 110 : holderP.y;
     if (p.role === 0) tx = holderP.x - atk * 90;
   } else {
-    const mates = s.players.filter((m) => m.team === p.team && (m.team === 1 || s.players.indexOf(m) !== s.controlled));
+    // the last man guards the goal: he only comes out for a loose ball that is close to it
+    const ownGoalX = p.team === 0 ? 0 : COURT.w;
+    const looseNearGoal = !holderP && Math.abs(s.ball.x - ownGoalX) < STREET.keeper.comeOutPx;
+    const mates = s.players.filter(
+      (m) => m.team === p.team && s.players.indexOf(m) !== s.controlled[m.team] && (m.role !== 0 || looseNearGoal)
+    );
     const chaser = mates.sort((a, b) => dist(a.x, a.y, s.ball.x, s.ball.y) - dist(b.x, b.y, s.ball.x, s.ball.y))[0];
-    if (chaser === p) {
+    if (p.role === 0 && chaser !== p) {
+      tx = ownGoalX + atk * STREET.keeper.linePx;
+      ty = Math.max(COURT.goalTop + 6, Math.min(COURT.goalBottom - 6, s.ball.y));
+    } else if (chaser === p) {
       const target = holderP ?? s.ball;
       tx = target.x;
       ty = target.y;
@@ -264,50 +355,83 @@ function humanIntent(input: StreetInput, prev: StreetInput): Intent {
     dx: (input.right ? 1 : 0) - (input.left ? 1 : 0),
     dy: (input.down ? 1 : 0) - (input.up ? 1 : 0),
     pass: input.pass && !prev.pass,
-    shoot: input.shoot && !prev.shoot,
+    // the shot loads while the key is held and goes off on release
+    shoot: !input.shoot && prev.shoot,
     trick: input.trick && !prev.trick,
   };
 }
 
-function updateControlled(s: StreetState): void {
-  if (!s.hasHuman) {
-    s.controlled = -1;
-    return;
-  }
-  if (s.holder >= 0 && s.players[s.holder].team === 0) {
-    s.controlled = s.holder;
-    return;
-  }
-  let best = s.controlled;
-  let bestD = dist(s.players[best].x, s.players[best].y, s.ball.x, s.ball.y) - STREET.switchHysteresisPx;
-  for (let j = 0; j < 3; j++) {
+/** The switch key: hand control to the teammate closest to the ball. Does
+ * nothing while your team has the ball, since you already play whoever has it. */
+function switchPlayer(s: StreetState, team: 0 | 1): void {
+  if (s.holder >= 0 && s.players[s.holder].team === team) return;
+  let best = -1;
+  let bestD = Infinity;
+  for (let j = team * 3; j < team * 3 + 3; j++) {
+    if (j === s.controlled[team]) continue;
     const d = dist(s.players[j].x, s.players[j].y, s.ball.x, s.ball.y);
     if (d < bestD) {
       bestD = d;
       best = j;
     }
   }
-  s.controlled = best;
+  if (best < 0) return;
+  s.controlled[team] = best;
+  s.switchLockMs[team] = STREET.switchLockMs;
+}
+
+/** Each human plays whoever has the ball on their team, or else (unless they
+ * switch by hand only) whoever is closest to it. */
+function updateControlled(s: StreetState, inputs: [StreetInput, StreetInput], dtMs: number): void {
+  for (const team of [0, 1] as const) {
+    if (!s.humans[team]) {
+      s.controlled[team] = -1;
+      continue;
+    }
+    s.switchLockMs[team] = Math.max(0, s.switchLockMs[team] - dtMs);
+    if (inputs[team].switch && !s.prev[team].switch) switchPlayer(s, team);
+    if (s.holder >= 0 && s.players[s.holder].team === team) {
+      s.controlled[team] = s.holder;
+      continue;
+    }
+    if (s.controlled[team] >= 0 && (inputs[team].manualSwitch || s.switchLockMs[team] > 0)) continue;
+    let best = s.controlled[team] >= 0 ? s.controlled[team] : team * 3 + 1;
+    let bestD = dist(s.players[best].x, s.players[best].y, s.ball.x, s.ball.y) - STREET.switchHysteresisPx;
+    for (let j = team * 3; j < team * 3 + 3; j++) {
+      const d = dist(s.players[j].x, s.players[j].y, s.ball.x, s.ball.y);
+      // the last man keeps guarding the goal on his own unless the ball is right on him
+      if (s.players[j].role === 0 && j !== best && d > STREET.keeper.comeOutPx) continue;
+      if (d < bestD) {
+        bestD = d;
+        best = j;
+      }
+    }
+    s.controlled[team] = best;
+  }
 }
 
 function endIfOver(s: StreetState): void {
   const [a, b] = s.score;
-  if (a >= s.targetGoals || b >= s.targetGoals || s.clockMs <= 0) {
+  // level when the clock runs out: play on, next goal wins (gol de oro)
+  if (a >= s.targetGoals || b >= s.targetGoals || (s.clockMs <= 0 && a !== b)) {
     s.phase = 'ended';
     s.winner = a === b ? 'draw' : a > b ? 0 : 1;
   }
 }
 
-export function stepStreet(s: StreetState, input: StreetInput, dtMs: number): void {
+/** `input` is team 0's human, or one input per team when both sides are played by people. */
+export function stepStreet(s: StreetState, input: StreetInput | [StreetInput, StreetInput], dtMs: number): void {
   if (s.phase === 'ended') return;
+  const inputs: [StreetInput, StreetInput] = Array.isArray(input) ? input : [input, emptyStreetInput()];
   const dt = dtMs / 1000;
 
   if (s.phase === 'goal') {
     s.phaseMs -= dtMs;
     if (s.phaseMs <= 0) {
-      const over = s.score[0] >= s.targetGoals || s.score[1] >= s.targetGoals || s.clockMs <= 0;
-      if (over) endIfOver(s);
-      else {
+      const over = s.score[0] >= s.targetGoals || s.score[1] >= s.targetGoals || (s.clockMs <= 0 && s.score[0] !== s.score[1]);
+      if (over) {
+        if (s.authoritative) endIfOver(s);
+      } else {
         kickoff(s, s.lastScorer === 0 ? 1 : 0);
         s.phase = 'playing';
       }
@@ -316,8 +440,13 @@ export function stepStreet(s: StreetState, input: StreetInput, dtMs: number): vo
   }
 
   s.clockMs = Math.max(0, s.clockMs - dtMs);
-  updateControlled(s);
+  s.crackMs = [Math.max(0, s.crackMs[0] - dtMs), Math.max(0, s.crackMs[1] - dtMs)];
+  s.popups = s.popups.filter((q) => (q.ms -= dtMs) > 0);
+  updateControlled(s, inputs, dtMs);
   const cfg = STREET.difficulty[s.difficulty];
+  const c = STREET.charge;
+  const chargePower = s.chargeMs.map((ms) => c.minPower + (c.maxPower - c.minPower) * Math.min(1, ms / c.maxMs));
+  s.chargeMs = [inputs[0].shoot ? s.chargeMs[0] + dtMs : 0, inputs[1].shoot ? s.chargeMs[1] + dtMs : 0];
 
   // --- decisions and movement
   s.players.forEach((p, i) => {
@@ -326,9 +455,11 @@ export function stepStreet(s: StreetState, input: StreetInput, dtMs: number): vo
     p.trickCd = Math.max(0, p.trickCd - dtMs);
     p.pickupCd = Math.max(0, p.pickupCd - dtMs);
     p.tackleLockMs = Math.max(0, p.tackleLockMs - dtMs);
+    p.stunMs = Math.max(0, p.stunMs - dtMs);
 
-    const human = i === s.controlled;
-    const intent = human ? humanIntent(input, s.prev) : aiIntent(s, i);
+    const human = i === s.controlled[p.team];
+    const intent = human ? humanIntent(inputs[p.team], s.prev[p.team]) : aiIntent(s, i);
+    if (p.stunMs > 0) Object.assign(intent, { dx: 0, dy: 0, pass: false, shoot: false, trick: false });
     const aimError = human ? STREET.humanAimError : cfg.aimErr;
 
     const [mx, my] = unit(intent.dx, intent.dy, 0, 0);
@@ -342,13 +473,20 @@ export function stepStreet(s: StreetState, input: StreetInput, dtMs: number): vo
     if (intent.trick && p.trickCd <= 0) {
       p.trickMs = STREET.trickMs;
       p.trickCd = STREET.trickCooldownMs;
+      p.canoDone = false;
+      const rivalClose = s.players.some((o) => o.team !== p.team && dist(o.x, o.y, p.x, p.y) < STREET.style.rivalNearPx);
+      if (s.holder === i && rivalClose) {
+        addStyle(s, p.team, STREET.style.trickPastRival);
+        popup(s, p.team, '¡Gambeta!', p.x, p.y);
+      }
       if (moving) {
         p.vx = mx * STREET.speed * STREET.trickBoost;
         p.vy = my * STREET.speed * STREET.trickBoost;
       }
     }
 
-    const base = (human ? STREET.speed : STREET.speed * cfg.speed) * (s.holder === i ? STREET.carrierSlow : 1);
+    const crackBoost = s.crackMs[p.team] > 0 ? STREET.crack.speedBoost : 1;
+    const base = (human ? STREET.speed : STREET.speed * cfg.speed) * (s.holder === i ? STREET.carrierSlow : 1) * crackBoost;
     const top = p.trickMs > 0 ? base * STREET.trickBoost : base;
     p.vx += (mx * top - p.vx) * Math.min(1, STREET.accel * dt);
     p.vy += (my * top - p.vy) * Math.min(1, STREET.accel * dt);
@@ -358,7 +496,13 @@ export function stepStreet(s: StreetState, input: StreetInput, dtMs: number): vo
     // actions
     const nearBall = s.holder < 0 && dist(p.x, p.y, s.ball.x, s.ball.y) < PLAYER_R + BALL_R + 14 && p.pickupCd <= 0;
     if (s.holder === i || nearBall) {
-      if (intent.shoot) doShoot(s, i, human ? intent.dy : 0, aimError);
+      if (intent.shoot) {
+        // the CPU aims for the side of the goal the rival's last man has left open
+        const guard = s.players.find((o) => o.team !== p.team && o.role === 0);
+        const mid = (COURT.goalTop + COURT.goalBottom) / 2;
+        const cpuAim = guard && guard.y > mid ? -0.7 : 0.7;
+        doShoot(s, i, human ? intent.dy : cpuAim, aimError, human ? chargePower[p.team] : 1);
+      }
       else if (intent.pass && s.holder === i) {
         const [ax, ay] = moving ? [mx, my] : [p.fx, p.fy];
         doPass(s, i, ax, ay);
@@ -395,12 +539,22 @@ export function stepStreet(s: StreetState, input: StreetInput, dtMs: number): vo
 
     // tackles: an opponent has to stay on the carrier for a moment
     s.players.forEach((o, j) => {
-      if (o.team === h.team) return;
-      const touching = dist(o.x, o.y, h.x, h.y) < PLAYER_R * 2 + 4 && h.trickMs <= 0 && o.tackleLockMs <= 0;
+      if (o.team === h.team || s.holder < 0) return;
+      const contact = dist(o.x, o.y, h.x, h.y) < PLAYER_R * 2 + 4;
+      // caño: running into a rival mid-gambeta puts the ball through their legs
+      if (contact && h.trickMs > 0 && !h.canoDone && o.stunMs <= 0) {
+        h.canoDone = true;
+        o.stunMs = STREET.style.canoStunMs;
+        o.tackleMs = 0;
+        addStyle(s, h.team, STREET.style.cano);
+        popup(s, h.team, '¡CAÑO!', o.x, o.y);
+      }
+      const touching = contact && h.trickMs <= 0 && o.tackleLockMs <= 0 && o.stunMs <= 0;
       o.tackleMs = touching ? o.tackleMs + dtMs : Math.max(0, o.tackleMs - dtMs * 2);
-      if (o.tackleMs >= cfg.tackleMs && s.holder >= 0) {
+      if (o.tackleMs >= cfg.tackleMs) {
         h.pickupCd = STREET.tackledPickupCdMs;
         h.tackleLockMs = STREET.tackleLockMs;
+        addStyle(s, h.team, -STREET.style.robbed);
         s.holder = j;
         s.players.forEach((q) => (q.tackleMs = 0));
       }
@@ -430,7 +584,7 @@ export function stepStreet(s: StreetState, input: StreetInput, dtMs: number): vo
       let bestD = PLAYER_R + BALL_R + 4;
       s.players.forEach((p, j) => {
         const d = dist(p.x, p.y, ball.x, ball.y);
-        if (p.pickupCd <= 0 && d < bestD) {
+        if (p.pickupCd <= 0 && p.stunMs <= 0 && d < bestD) {
           bestD = d;
           bestJ = j;
         }
@@ -464,17 +618,24 @@ export function stepStreet(s: StreetState, input: StreetInput, dtMs: number): vo
   // --- goals
   const inMouth = ball.y > COURT.goalTop && ball.y < COURT.goalBottom;
   const scoredFor: 0 | 1 | null = inMouth && ball.x > COURT.w ? 0 : inMouth && ball.x < 0 ? 1 : null;
-  if (scoredFor !== null) {
-    s.score[scoredFor] += 1;
+  if (scoredFor !== null && !s.authoritative) {
+    // a guest's prediction never scores: the ball waits in the net until the host's snapshot says goal
+    ball.vx = 0;
+    ball.vy = 0;
+  } else if (scoredFor !== null) {
+    const crackGoal = s.crackMs[scoredFor] > 0;
+    s.score[scoredFor] += crackGoal ? STREET.crack.goalValue : 1;
+    if (crackGoal) popup(s, scoredFor, `¡GOL CRACK! x${STREET.crack.goalValue}`, COURT.w / 2, COURT.h / 2 - 40);
+    else addStyle(s, scoredFor, STREET.style.goal);
     s.lastScorer = scoredFor;
     s.phase = 'goal';
     s.phaseMs = STREET.goalPauseMs;
     s.holder = -1;
     ball.vx = 0;
     ball.vy = 0;
-  } else if (s.clockMs <= 0) {
+  } else if (s.clockMs <= 0 && s.authoritative) {
     endIfOver(s);
   }
 
-  s.prev = { ...input };
+  s.prev = [{ ...inputs[0] }, { ...inputs[1] }];
 }

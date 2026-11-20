@@ -123,6 +123,31 @@ export async function validateTuttiAnswer(rule: TuttiRule, letter: string, answe
       match = await findMatch('players', 'name', trimmed, (q) => q.gte('international_caps', rule.minCaps));
       break;
 
+    case 'player_nationality':
+      match = await findMatch('players', 'name', trimmed, (q) => q.in('country_of_citizenship', rule.countries));
+      break;
+
+    case 'player_foot':
+      match = await findMatch('players', 'name', trimmed, (q) => q.eq('foot', rule.foot));
+      break;
+
+    case 'player_sub_position':
+      match = await findMatch('players', 'name', trimmed, (q) => q.in('sub_position', rule.subPositions));
+      break;
+
+    case 'player_height':
+      match = await findMatch('players', 'name', trimmed, (q) => {
+        let narrowed = q;
+        if (rule.minCm !== undefined) narrowed = narrowed.gte('height_in_cm', rule.minCm);
+        if (rule.maxCm !== undefined) narrowed = narrowed.lte('height_in_cm', rule.maxCm);
+        return narrowed;
+      });
+      break;
+
+    case 'club_in_league':
+      match = await findMatch('clubs', 'name', trimmed, (q) => q.in('competition_id', rule.competitionIds));
+      break;
+
     case 'player_at_clubs': {
       const { data: clubPlayers, error: clubError } = await supabase
         .from('player_clubs')

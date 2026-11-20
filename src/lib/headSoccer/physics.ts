@@ -4,6 +4,8 @@ export const FIELD_WIDTH = 800;
 export const FIELD_HEIGHT = 450;
 export const GROUND_Y = 400;
 export const GOAL_HEIGHT = 130;
+/** how far each goal reaches into the field; the ball scores once it's past this line, under the bar */
+export const GOAL_DEPTH = 56;
 
 const GRAVITY_PLAYER = 2200;
 const GRAVITY_BALL = 1500;
@@ -18,6 +20,11 @@ const KICK_POWER = 900;
 const KICK_COOLDOWN_MS = 350;
 const KICK_UPWARD_RATIO = 0.55;
 const GOAL_PAUSE_MS = 1200;
+const CROSSBAR_HALF_THICKNESS = 4;
+const CROSSBAR_BOUNCE_DAMPING = 0.7;
+/** a ball resting on top of a goal slowly rolls back towards the pitch */
+const CROSSBAR_ROLL_OFF = 45;
+const BODY_BOUNCE_SPEED = 320;
 
 export const DEFAULT_MATCH_CONFIG: MatchConfig = {
   durationMs: 90_000,
@@ -117,18 +124,70 @@ function updateBall(ball: Ball, dtSec: number): Ball {
     next.vy = Math.abs(next.vy) * GROUND_BOUNCE_DAMPING;
   }
 
-  const inGoalMouth = next.y + next.radius > GROUND_Y - GOAL_HEIGHT;
-
-  if (next.x - next.radius < 0 && !inGoalMouth) {
+  if (next.x - next.radius < 0) {
     next.x = next.radius;
     next.vx = Math.abs(next.vx) * WALL_BOUNCE_DAMPING;
   }
-  if (next.x + next.radius > FIELD_WIDTH && !inGoalMouth) {
+  if (next.x + next.radius > FIELD_WIDTH) {
     next.x = FIELD_WIDTH - next.radius;
     next.vx = -Math.abs(next.vx) * WALL_BOUNCE_DAMPING;
   }
 
-  return next;
+  return collideCrossbar(collideCrossbar(next, 'left'), 'right');
+}
+
+/** The crossbar (and roof) of a goal: a horizontal bar from the back wall to
+ * the goal line. The ball bounces off its top, its underside and its tip. */
+function collideCrossbar(ball: Ball, side: 'left' | 'right'): Ball {
+  const barY = GROUND_Y - GOAL_HEIGHT;
+  const x0 = side === 'left' ? 0 : FIELD_WIDTH - GOAL_DEPTH;
+  const x1 = x0 + GOAL_DEPTH;
+  const nearestX = clamp(ball.x, x0, x1);
+  const dx = ball.x - nearestX;
+  const dy = ball.y - barY;
+  const dist = Math.hypot(dx, dy);
+  const minDist = ball.radius + CROSSBAR_HALF_THICKNESS;
+  if (dist >= minDist) return ball;
+
+  // dead centre on the bar: push it back the way it came
+  const nx = dist > 0.001 ? dx / dist : 0;
+  const ny = dist > 0.001 ? dy / dist : ball.vy > 0 ? -1 : 1;
+  const into = ball.vx * nx + ball.vy * ny;
+  let vx = ball.vx;
+  let vy = ball.vy;
+  if (into < 0) {
+    vx -= (1 + CROSSBAR_BOUNCE_DAMPING) * into * nx;
+    vy -= (1 + CROSSBAR_BOUNCE_DAMPING) * into * ny;
+  }
+  if (ny < -0.5) vx += side === 'left' ? CROSSBAR_ROLL_OFF : -CROSSBAR_ROLL_OFF;
+
+  return { ...ball, x: nearestX + nx * minDist, y: barY + ny * minDist, vx, vy };
+}
+
+/** The rest of the player (torso and boots) is solid too, so the ball can't
+ * slip under the head: it gets nudged along, which is how you dribble. */
+function resolveBodyCollision(ball: Ball, p: PlayerBody): Ball {
+  const parts = [
+    { y: p.y + p.headRadius + p.bodyHeight * 0.25, r: p.bodyWidth * 0.58 },
+    { y: p.y + p.headRadius + p.bodyHeight * 0.72, r: p.bodyWidth * 0.52 },
+  ];
+  for (const part of parts) {
+    const dx = ball.x - p.x;
+    const dy = ball.y - part.y;
+    const dist = Math.hypot(dx, dy) || 0.001;
+    const minDist = ball.radius + part.r;
+    if (dist >= minDist) continue;
+    const nx = dx / dist;
+    const ny = dy / dist;
+    return {
+      ...ball,
+      x: ball.x + nx * (minDist - dist),
+      y: ball.y + ny * (minDist - dist),
+      vx: nx * BODY_BOUNCE_SPEED + p.vx * 0.6,
+      vy: ny * BODY_BOUNCE_SPEED,
+    };
+  }
+  return ball;
 }
 
 /** Circle-circle collision between a player's head and the ball — pushes the
@@ -159,8 +218,8 @@ function applyKick(ball: Ball, p: PlayerBody, input: Input): { ball: Ball; kicke
   if (!input.kick || p.kickCooldownMs > 0) return { ball, kicked: false };
 
   const dx = ball.x - p.x;
-  const dy = ball.y - p.y;
-  const dist = Math.hypot(dx, dy);
+  const feetY = p.y + p.headRadius + p.bodyHeight * 0.72;
+  const dist = Math.min(Math.hypot(dx, ball.y - p.y), Math.hypot(dx, ball.y - feetY));
   if (dist > KICK_RANGE) return { ball, kicked: false };
 
   const dirX = p.facing;
@@ -174,14 +233,23 @@ function applyKick(ball: Ball, p: PlayerBody, input: Input): { ball: Ball; kicke
 }
 
 function checkGoal(ball: Ball): 1 | 2 | null {
-  const inGoalMouth = ball.y + ball.radius > GROUND_Y - GOAL_HEIGHT;
-  if (!inGoalMouth) return null;
-  if (ball.x - ball.radius <= 0) return 2;
-  if (ball.x + ball.radius >= FIELD_WIDTH) return 1;
+  const underBar = ball.y > GROUND_Y - GOAL_HEIGHT;
+  if (!underBar) return null;
+  const line = GOAL_DEPTH - ball.radius / 2;
+  if (ball.x < line) return 2;
+  if (ball.x > FIELD_WIDTH - line) return 1;
   return null;
 }
 
-export function step(state: GameState, inputs: [Input, Input], dtMs: number, config: MatchConfig = DEFAULT_MATCH_CONFIG): GameState {
+/** `canScore` is false on an online guest: its copy only predicts, so goals and
+ * the final whistle come from the host's snapshots, never from the guest itself. */
+export function step(
+  state: GameState,
+  inputs: [Input, Input],
+  dtMs: number,
+  config: MatchConfig = DEFAULT_MATCH_CONFIG,
+  canScore = true
+): GameState {
   if (state.phase === 'ended') return state;
 
   const dtSec = dtMs / 1000;
@@ -225,14 +293,23 @@ export function step(state: GameState, inputs: [Input, Input], dtMs: number, con
   for (const i of order) {
     const before = ball;
     ball = resolveHeadCollision(ball, players[i]);
+    if (ball === before) ball = resolveBodyCollision(ball, players[i]);
     if (ball !== before) continue; // already bounced off this player, skip kick same frame
     const kickResult = applyKick(ball, players[i], inputs[i]);
     ball = kickResult.ball;
     if (kickResult.kicked) players[i] = { ...players[i], kickCooldownMs: KICK_COOLDOWN_MS };
   }
 
+  // a player can shove the ball into a wall: keep it inside the field
+  ball = { ...ball, x: clamp(ball.x, ball.radius, FIELD_WIDTH - ball.radius) };
+
   const clockMs = Math.max(0, state.clockMs - dtMs);
-  const scorer = checkGoal(ball);
+  let scorer = checkGoal(ball);
+  if (scorer && !canScore) {
+    // the ball waits on the line until the host says whether it went in
+    ball = { ...ball, vx: 0 };
+    scorer = null;
+  }
 
   let scoreP1 = state.scoreP1;
   let scoreP2 = state.scoreP2;
@@ -257,7 +334,7 @@ export function step(state: GameState, inputs: [Input, Input], dtMs: number, con
       phase = 'goal_pause';
       goalPauseRemainingMs = GOAL_PAUSE_MS;
     }
-  } else if (clockMs <= 0 && scoreP1 !== scoreP2) {
+  } else if (canScore && clockMs <= 0 && scoreP1 !== scoreP2) {
     winner = scoreP1 > scoreP2 ? 1 : 2;
     phase = 'ended';
   }

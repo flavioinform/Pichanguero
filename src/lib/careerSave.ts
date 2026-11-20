@@ -1,4 +1,5 @@
 import type { CareerPlayerState } from './careerTypes';
+import { unlockAchievements } from './careerAchievements';
 
 const SAVE_KEY = 'pichanguero.career.v1';
 
@@ -13,6 +14,7 @@ export function loadCareerSave(): CareerPlayerState | null {
 }
 
 export function saveCareer(state: CareerPlayerState): void {
+  unlockAchievements(state);
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
   } catch {

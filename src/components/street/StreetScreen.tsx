@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react';
 import { ModeSelectLayout } from '../ModeSelectLayout';
 import { fetchCountries, type CountryOption } from '../../lib/careerData';
 import { ModeCard } from '../gato/ModeCard';
-import { CpuIcon } from '../gato/ModeIcons';
+import { CpuIcon, OnlineIcon } from '../gato/ModeIcons';
 import { CountryPickStep } from '../headsoccer/CountryPickStep';
 import type { Difficulty } from '../../lib/street/engine';
 import { StreetGame } from './StreetGame';
+import { StreetOnlineScreen } from './StreetOnlineScreen';
 
 interface StreetScreenProps {
   onBack: () => void;
 }
 
-type Step = 'difficulty' | 'pick' | 'play';
+type Step = 'difficulty' | 'pick' | 'play' | 'online';
 
 const LEVELS: Array<{ id: Difficulty; label: string; description: string }> = [
   { id: 'easy', label: 'Fácil', description: 'La CPU es lenta y apunta mal' },
@@ -39,6 +40,10 @@ export function StreetScreen({ onBack }: StreetScreenProps) {
     setStep('play');
   }
 
+  if (step === 'online') {
+    return <StreetOnlineScreen onBack={() => setStep('difficulty')} />;
+  }
+
   if (step === 'play' && mine && rival) {
     return <StreetGame p1CountryName={mine.name} p2CountryName={rival.name} difficulty={difficulty} onBack={onBack} />;
   }
@@ -61,6 +66,12 @@ export function StreetScreen({ onBack }: StreetScreenProps) {
           }}
         />
       ))}
+      <ModeCard
+        icon={<OnlineIcon />}
+        label="Jugar online"
+        description="Creá una sala o unite con un código"
+        onClick={() => setStep('online')}
+      />
     </ModeSelectLayout>
   );
 }

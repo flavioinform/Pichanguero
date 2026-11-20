@@ -3,6 +3,7 @@ import { colors, fonts } from '../../theme';
 import { useViewport } from '../../hooks/useViewport';
 import { CardArt } from '../CardArt';
 import type { CareerDifficulty } from '../../lib/careerTypes';
+import { AchievementsPanel } from './Achievements';
 
 interface CareerDifficultyStepProps {
   onChoose: (difficulty: CareerDifficulty) => void;
@@ -17,6 +18,7 @@ const OPTIONS: { value: CareerDifficulty; label: string; caption: string }[] = [
 
 export function CareerDifficultyStep({ onChoose, onBack }: CareerDifficultyStepProps) {
   const [selected, setSelected] = useState<CareerDifficulty>('intensa');
+  const [showAchievements, setShowAchievements] = useState(false);
   const active = OPTIONS.find((o) => o.value === selected)!;
   const viewport = useViewport();
   const mobile = viewport === 'mobile';
@@ -34,7 +36,7 @@ export function CareerDifficultyStep({ onChoose, onBack }: CareerDifficultyStepP
           padding: mobile ? '20px 16px 0' : tablet ? '24px 32px 0' : '28px 56px 0',
         }}
       >
-        Minijuegos Copero
+        Pichanguero · Modo carrera
       </div>
 
       <div
@@ -132,9 +134,25 @@ export function CareerDifficultyStep({ onChoose, onBack }: CareerDifficultyStepP
             >
               Volver a juegos
             </button>
+            <button
+              onClick={() => setShowAchievements(true)}
+              style={{
+                padding: '14px 24px',
+                borderRadius: 999,
+                background: 'none',
+                border: `1px solid ${colors.accent}`,
+                color: colors.accentLight,
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              ★ Ver logros
+            </button>
           </div>
         </div>
       </div>
+      {showAchievements && <AchievementsPanel onClose={() => setShowAchievements(false)} />}
     </div>
   );
 }

@@ -53,3 +53,11 @@ export interface MatchConfig {
   durationMs: number;
   goalsToWin: number;
 }
+
+/** Presses of jump/kick since the last tick: a tap shorter than one tick
+ * (a press and its release between two ticks) still counts once. */
+export type InputTaps = Partial<Record<'jump' | 'kick', boolean>>;
+
+export function withTaps(input: Input, taps: InputTaps): Input {
+  return { ...input, jump: input.jump || !!taps.jump, kick: input.kick || !!taps.kick };
+}

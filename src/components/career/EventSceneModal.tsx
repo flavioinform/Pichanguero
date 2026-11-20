@@ -19,6 +19,7 @@ const SCENE_STYLE: Record<CareerEvent['type'], { gradient: string; icon: string 
   debut: { gradient: 'linear-gradient(160deg, #173a20, #0a0a0c)', icon: '⚽' },
   injury: { gradient: 'linear-gradient(160deg, #4a1414, #0a0a0c)', icon: '🩹' },
   trophy: { gradient: 'linear-gradient(160deg, #4a3c0a, #0a0a0c)', icon: '🏆' },
+  award: { gradient: 'linear-gradient(160deg, #4a3c0a, #1a1206)', icon: '🥇' },
   call_up: { gradient: 'linear-gradient(160deg, #0f2a4a, #0a0a0c)', icon: '📣' },
   transfer_offer: { gradient: 'linear-gradient(160deg, #1d1d3a, #0a0a0c)', icon: '✍️' },
   transfer_rejected: { gradient: 'linear-gradient(160deg, #2a2a2a, #0a0a0c)', icon: '🚫' },

@@ -36,6 +36,7 @@ export type CareerEventType =
   | 'injury'
   | 'trophy'
   | 'call_up'
+  | 'award'
   | 'transfer_offer'
   | 'transfer_rejected'
   | 'loan_start'
@@ -62,6 +63,14 @@ export interface CareerSeasonRecord {
   gls: number;
   ast: number;
   events: CareerEvent[];
+}
+
+export type CareerAwardKind = 'breakout' | 'top_scorer' | 'ballon';
+
+export interface CareerAward {
+  kind: CareerAwardKind;
+  label: string;
+  age: number;
 }
 
 export type PendingDecisionKind = 'club_offer' | 'transfer_offer' | 'retire_or_continue';
@@ -98,6 +107,8 @@ export interface CareerPlayerState {
   loanParentCompetitionName: string | null;
   careerTotals: { pj: number; gls: number; ast: number };
   trophies: { label: string; tier: 'league' | 'cup' | 'continental' }[];
+  /** individual prizes; missing in careers saved before awards existed */
+  awards?: CareerAward[];
   seasons: CareerSeasonRecord[];
   pendingDecision: PendingDecision | null;
   pendingEvents: CareerEvent[];

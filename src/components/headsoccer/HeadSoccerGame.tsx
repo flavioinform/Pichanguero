@@ -2,14 +2,13 @@ import { useEffect, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import { colors } from '../../theme';
 import { jerseyColors } from '../../lib/countryVisuals';
-import { fetchRandomPlayerPhoto } from '../../lib/careerData';
 import { FIELD_HEIGHT, FIELD_WIDTH } from '../../lib/headSoccer/physics';
-import type { GameState, Input } from '../../lib/headSoccer/types';
+import { withTaps, type GameState, type Input, type InputTaps } from '../../lib/headSoccer/types';
 import { mergeSnapshot } from '../../lib/headSoccer/netSync';
 import { HEAD_SOCCER_ONLINE } from '../../config/gameConfig';
 import { useViewport } from '../../hooks/useViewport';
 import { useGameLoop } from './useGameLoop';
-import { ClockChip, ControlHint, GoalBanner, ScoreBar } from './Hud';
+import { ControlHint, GoalBanner } from './Hud';
 import { Controls } from './Controls';
 import { HeadSoccerResult } from './HeadSoccerResult';
 import type { HeadSoccerMode } from './types';
@@ -18,7 +17,8 @@ interface OnlineProps {
   /** Host is always physics-index 0 (P1), guest is always index 1 (P2) —
    * both clients must agree on this without negotiating it per-match. */
   isHost: boolean;
-  remoteInputRef: MutableRefObject<Input>;
+  /** host only: the guest's keys for the next tick */
+  takeRemoteInput: () => Input;
   sendInput: (input: Input) => void;
   /** host only: publish the authoritative game state */
   sendState: (state: GameState) => void;
@@ -53,48 +53,27 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
   const arrowInput = useRef<Input>(emptyInput());
   const p1TouchInput = useRef<Input>(emptyInput());
   const p2TouchInput = useRef<Input>(emptyInput());
+  // presses since the last tick, per source, so a tap shorter than a tick still counts
+  const wasdTaps = useRef<InputTaps>({});
+  const arrowTaps = useRef<InputTaps>({});
+  const p1TouchTaps = useRef<InputTaps>({});
+  const p2TouchTaps = useRef<InputTaps>({});
+
+  /** what a source holds right now, plus its taps since the last tick (which it then forgets) */
+  function read(input: MutableRefObject<Input>, taps: MutableRefObject<InputTaps>): Input {
+    const out = withTaps(input.current, taps.current);
+    taps.current = {};
+    return out;
+  }
 
   const p1Colors = jerseyColors(p1CountryName);
   const p2Colors = jerseyColors(p2CountryName);
-
-  const p1ImageRef = useRef<HTMLImageElement | null>(null);
-  const p2ImageRef = useRef<HTMLImageElement | null>(null);
-
-  // Real player photos (one per character, fetched once and never re-rolled
-  // for this match) used as the "head" instead of a drawn cartoon face —
-  // same approach as the career-mode avatar. Loaded into plain
-  // HTMLImageElements so the canvas render loop can draw them directly;
-  // `render.ts` falls back to the cartoon head until each one finishes
-  // loading (or if the fetch comes back empty).
-  useEffect(() => {
-    let cancelled = false;
-    fetchRandomPlayerPhoto(p1CountryName)
-      .then((url) => {
-        if (cancelled || !url) return;
-        const img = new Image();
-        img.src = url;
-        p1ImageRef.current = img;
-      })
-      .catch(() => {});
-    fetchRandomPlayerPhoto(p2CountryName)
-      .then((url) => {
-        if (cancelled || !url) return;
-        const img = new Image();
-        img.src = url;
-        p2ImageRef.current = img;
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Online mode: the local human always plays with WASD/touch regardless of
   // host/guest, and their input gets sent to the peer every tick; the other
   // physics slot reads from whatever last arrived over the broadcast channel.
   function getLocalOnlineInput(): Input {
-    const input = mergeInputs(wasdInput.current, p1TouchInput.current, arrowInput.current);
+    const input = mergeInputs(read(wasdInput, wasdTaps), read(p1TouchInput, p1TouchTaps), read(arrowInput, arrowTaps));
     online?.sendInput(input);
     return input;
   }
@@ -103,15 +82,16 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
     mode === 'online' && online
       ? online.isHost
         ? getLocalOnlineInput
-        : () => online.remoteInputRef.current
-      : () => mergeInputs(wasdInput.current, p1TouchInput.current, mode === 'cpu' ? arrowInput.current : emptyInput());
+        : online.takeRemoteInput
+      : () =>
+          mergeInputs(read(wasdInput, wasdTaps), read(p1TouchInput, p1TouchTaps), mode === 'cpu' ? read(arrowInput, arrowTaps) : emptyInput());
 
   const getP2Input =
     mode === 'online' && online
       ? online.isHost
-        ? () => online.remoteInputRef.current
+        ? online.takeRemoteInput
         : getLocalOnlineInput
-      : () => mergeInputs(arrowInput.current, p2TouchInput.current);
+      : () => mergeInputs(read(arrowInput, arrowTaps), read(p2TouchInput, p2TouchTaps));
 
   // Online: both peers simulate locally with the latest inputs they know, so
   // play looks smooth; the host's snapshots keep the two from drifting apart.
@@ -141,12 +121,12 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
     syncIn,
     p1Colors,
     p2Colors,
-    p1ImageRef,
-    p2ImageRef,
+    labels: [shortLabel(p1CountryName), shortLabel(p2CountryName)],
   });
 
   useEffect(() => {
     function setKey(ref: MutableRefObject<Input>, key: keyof Input, value: boolean) {
+      if (value && (key === 'jump' || key === 'kick')) (ref === wasdInput ? wasdTaps : arrowTaps).current[key] = true;
       ref.current = { ...ref.current, [key]: value };
     }
 
@@ -205,9 +185,6 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
   }, []);
 
   const mobile = useViewport() === 'mobile';
-  const seconds = Math.ceil(hud.clockMs / 1000);
-  const clockLabel = `${String(Math.floor(seconds / 60)).padStart(1, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-
   return (
     <div
       style={{
@@ -250,21 +227,11 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
           }}
         />
 
-        <div style={{ position: 'absolute', top: 10, left: 26, display: mobile ? 'none' : 'flex', gap: 8 }}>
-          {mode === 'local2p' && <ControlHint moveKeys={['A', 'D']} jumpKey="W" kickKey="S" />}
-          {(mode === 'cpu' || mode === 'online') && <ControlHint moveKeys={['◀', '▶']} jumpKey="▲" kickKey="▼" />}
-        </div>
-        {mode === 'local2p' && !mobile && (
-          <div style={{ position: 'absolute', top: 10, right: 26 }}>
-            <ControlHint moveKeys={['◀', '▶']} jumpKey="▲" kickKey="▼" align="right" />
-          </div>
-        )}
-
         {online && !online.connected && (
           <div
             style={{
               position: 'absolute',
-              top: 44,
+              top: '24%',
               left: '50%',
               transform: 'translateX(-50%)',
               padding: '4px 12px',
@@ -280,14 +247,6 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
             Reconectando…
           </div>
         )}
-
-        <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)' }}>
-          <ClockChip label={clockLabel} />
-        </div>
-
-        <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)' }}>
-          <ScoreBar p1Label={p1CountryName} p1Color={p1Colors.primary} scoreP1={hud.scoreP1} p2Label={p2CountryName} p2Color={p2Colors.primary} scoreP2={hud.scoreP2} />
-        </div>
 
         {hud.justScored && <GoalBanner />}
 
@@ -305,15 +264,27 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
         )}
       </div>
 
-      {hud.phase !== 'ended' && (
+      {!mobile && (
+        <div style={{ display: 'flex', width: '100%', maxWidth: 880, justifyContent: 'space-between', padding: '0 16px', boxSizing: 'border-box' }}>
+          {mode === 'local2p' ? (
+            <ControlHint moveKeys={['A', 'D']} jumpKey="W" kickKey="S" />
+          ) : (
+            <ControlHint moveKeys={['◀', '▶']} jumpKey="▲" kickKey="▼" />
+          )}
+          {mode === 'local2p' && <ControlHint moveKeys={['◀', '▶']} jumpKey="▲" kickKey="▼" align="right" />}
+        </div>
+      )}
+
+      {hud.phase !== 'ended' && mobile && (
         <div style={{ display: 'flex', width: '100%', maxWidth: 880, justifyContent: 'space-between', padding: '0 16px', boxSizing: 'border-box' }}>
           <Controls
             inputRef={p1TouchInput}
+            tapsRef={p1TouchTaps}
             align="left"
             size={mobile ? 56 : 40}
             spread={mobile && mode !== 'local2p'}
           />
-          {mode === 'local2p' && <Controls inputRef={p2TouchInput} align="right" size={mobile ? 48 : 40} />}
+          {mode === 'local2p' && <Controls inputRef={p2TouchInput} tapsRef={p2TouchTaps} align="right" size={mobile ? 48 : 40} />}
         </div>
       )}
 
@@ -335,4 +306,13 @@ export function HeadSoccerGame({ mode, p1CountryName, p2CountryName, onBack, onl
       </button>
     </div>
   );
+}
+
+/** "Argentina" -> "ARG": fits the scoreboard. */
+function shortLabel(countryName: string): string {
+  return countryName
+    .normalize('NFD')
+    .replace(/[^A-Za-z]/g, '')
+    .slice(0, 3)
+    .toUpperCase();
 }

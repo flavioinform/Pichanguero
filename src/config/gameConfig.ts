@@ -85,12 +85,50 @@ export const STREET = {
   goalPauseMs: 1700,
   /** the controlled player only switches when another one is this much closer to the ball */
   switchHysteresisPx: 16,
+  /** after switching player by hand, the automatic switch leaves you alone this long */
+  switchLockMs: 1200,
   humanAimError: 0,
-  difficulty: {
-    easy: { speed: 0.85, aimErr: 120, tackleMs: 440, decisionMs: 650, shootRange: 300 },
-    normal: { speed: 0.95, aimErr: 70, tackleMs: 310, decisionMs: 450, shootRange: 340 },
-    hard: { speed: 1.05, aimErr: 45, tackleMs: 220, decisionMs: 300, shootRange: 380 },
+  /** each team's last man stands this far off his goal line and comes out for a loose ball this close to it */
+  keeper: { linePx: 34, comeOutPx: 130 },
+  /** style meter (0-100 per team): street flair fills it, a full meter starts "Modo Crack" */
+  style: {
+    /** gambeta started with a rival right on top of you */
+    trickPastRival: 14,
+    /** caño: going through a rival mid-gambeta leaves them on the floor */
+    cano: 30,
+    goal: 20,
+    /** points lost by the team whose carrier gets robbed */
+    robbed: 8,
+    /** how long a rival stays down after a caño */
+    canoStunMs: 900,
+    rivalNearPx: 46,
   },
+  crack: {
+    durationMs: 10_000,
+    speedBoost: 1.15,
+    shotBoost: 1.15,
+    /** a goal scored in Modo Crack is worth this many */
+    goalValue: 2,
+  },
+  popupMs: 1100,
+  /** hold the shoot key to load the shot; it goes off on release */
+  charge: { maxMs: 800, minPower: 0.8, maxPower: 1.35 },
+  difficulty: {
+    easy: { speed: 0.85, aimErr: 120, tackleMs: 440, decisionMs: 650, shootRange: 230 },
+    normal: { speed: 0.95, aimErr: 70, tackleMs: 310, decisionMs: 450, shootRange: 260 },
+    hard: { speed: 1.05, aimErr: 45, tackleMs: 220, decisionMs: 300, shootRange: 290 },
+  },
+};
+
+export const STREET_ONLINE = {
+  /** the host sends the whole match every this many ticks (60/s) */
+  snapshotEveryTicks: 6,
+  /** keys are resent at least this often even if unchanged, to recover a lost message */
+  inputHeartbeatMs: 300,
+  /** the guest's own player is kept where they see it while it's within this many px of the host's */
+  ownPositionTolerancePx: 45,
+  pingIntervalMs: 2000,
+  staleAfterMs: 5000,
 };
 
 export const AUCTION = {
@@ -170,4 +208,27 @@ export const CAREER = {
   /** player asks to leave: chance = base + (ovr - ovrFloor) * perOvr, capped at maxChance */
   requestTransfer: { baseChance: 0.3, ovrFloor: 60, perOvr: 0.012, maxChance: 0.85 },
   loanRefusalChance: 0.15,
+
+  /** individual prizes handed out at the end of a season */
+  awards: {
+    /** young player of the year: this age or younger with at least this many goals + assists; once per career */
+    breakout: { maxAge: 20, minGoalsPlusAssists: 18 },
+    topScorerMinGoals: 20,
+    /** Balón de Oro: needs this OVR plus a title or a big season, and then some luck */
+    ballon: { minOvr: 88, minGoalsPlusAssists: 25, chance: 0.4 },
+  },
+
+  /** how a finished career is remembered. Goals aren't counted directly, so a
+   * centre-back or a keeper can be a legend too: what counts is how long and
+   * how high you played, what you won and how often your country called. */
+  legacy: {
+    weights: { match: 0.3, peakOvrFloor: 60, peakOvrPoint: 6, callUp: 8, award: 35, trophy: { league: 20, cup: 12, continental: 40 } },
+    tiers: [
+      { minScore: 560, title: 'Leyenda eterna', blurb: 'Tu nombre queda en la historia grande del fútbol.' },
+      { minScore: 480, title: 'Ídolo', blurb: 'Hay una tribuna entera que todavía canta tu apellido.' },
+      { minScore: 400, title: 'Figura', blurb: 'Fuiste protagonista en cada cancha que pisaste.' },
+      { minScore: 340, title: 'Profesional de ley', blurb: 'Una carrera seria, de las que cualquiera firmaría.' },
+      { minScore: 0, title: 'Pichanguero de barrio', blurb: 'No hubo gloria, pero nadie te quita lo jugado.' },
+    ],
+  },
 };

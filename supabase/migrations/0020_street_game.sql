@@ -7,7 +7,7 @@ values (
   'street',
   'Fútbol callejero',
   'Partidos 3v3 en una cancha chica con paredes, gambetas y goles rápidos.',
-  'Movete con las flechas o WASD. J pasa, K tira y L hace la gambeta: un arranque corto en el que nadie te puede quitar la pelota. Gana quien llegue primero a 5 goles o tenga más cuando se acaba el tiempo.',
+  'Movete con las flechas o WASD. J pasa, K tira y L hace la gambeta: un arranque corto en el que nadie te puede quitar la pelota. Si gambeteás encima de un rival le hacés un caño y lo dejás en el piso. Las jugadas lindas llenan el medidor de estilo; lleno, entrás en Modo Crack y cada gol vale doble. Gana quien llegue primero a 5 goles o tenga más cuando se acaba el tiempo.',
   'street',
   '',
   false,

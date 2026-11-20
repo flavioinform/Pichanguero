@@ -1,4 +1,5 @@
 import type {
+  CareerAwardKind,
   CareerDifficulty,
   CareerEvent,
   CareerIdentity,
@@ -53,6 +54,7 @@ export function createInitialState(
     loanParentCompetitionName: null,
     careerTotals: { pj: 0, gls: 0, ast: 0 },
     trophies: [],
+    awards: [],
     seasons: [],
     pendingDecision: null,
     pendingEvents: [],
@@ -166,6 +168,41 @@ function rollEvents(
       title: '¡Convocatoria a la selección!',
       description: `${state.identity.nationality.name} lo convoca para la próxima fecha FIFA.`,
     });
+  }
+
+  // individual prizes for the season that just ended
+  const awards = (state.awards ??= []);
+  const a = CAREER.awards;
+  const involvement = season.gls + season.ast;
+  const giveAward = (kind: CareerAwardKind, label: string, title: string, description: string) => {
+    awards.push({ kind, label: `${label} (${age} años)`, age });
+    events.push({ type: 'award', sceneKey: `award_${kind}`, title, description });
+  };
+
+  if (age <= a.breakout.maxAge && involvement >= a.breakout.minGoalsPlusAssists && !awards.some((x) => x.kind === 'breakout')) {
+    giveAward(
+      'breakout',
+      'Revelación del año',
+      '¡Revelación del año!',
+      `Con ${age} años, ${state.identity.lastName} es elegido el mejor jugador joven de la temporada.`
+    );
+  }
+  if (season.gls >= a.topScorerMinGoals) {
+    giveAward(
+      'top_scorer',
+      'Goleador del torneo',
+      '¡Goleador del torneo!',
+      `${season.gls} goles en la temporada: nadie convirtió más que ${state.identity.lastName}.`
+    );
+  }
+  const wonTitle = events.some((e) => e.type === 'trophy');
+  if (ovr >= a.ballon.minOvr && (wonTitle || involvement >= a.ballon.minGoalsPlusAssists) && Math.random() < a.ballon.chance) {
+    giveAward(
+      'ballon',
+      'Balón de Oro',
+      '¡Balón de Oro!',
+      `El mundo del fútbol se rinde: ${state.identity.lastName} es elegido el mejor jugador del planeta.`
+    );
   }
 
   return events;
@@ -363,7 +400,7 @@ export function requestLoan(state: CareerPlayerState, candidateClubs: ClubOfferO
 export function shouldPauseForDecision(state: CareerPlayerState): boolean {
   if (state.difficulty === 'intensa') return true;
   if (state.pendingDecision) return true;
-  if (state.pendingEvents.some((e) => e.type === 'retirement' || e.type === 'trophy' || e.type === 'call_up')) {
+  if (state.pendingEvents.some((e) => e.type === 'retirement' || e.type === 'trophy' || e.type === 'award' || e.type === 'call_up')) {
     return true;
   }
   if (state.difficulty === 'normal') {

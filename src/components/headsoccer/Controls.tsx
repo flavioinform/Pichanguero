@@ -1,8 +1,10 @@
 import type { MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
-import type { Input } from '../../lib/headSoccer/types';
+import type { Input, InputTaps } from '../../lib/headSoccer/types';
 
 interface ControlsProps {
   inputRef: MutableRefObject<Input>;
+  /** presses since the last tick, so a very quick tap still counts */
+  tapsRef?: MutableRefObject<InputTaps>;
   align?: 'left' | 'right';
   /** Tamaño de cada botón en px (más grande en celular). */
   size?: number;
@@ -13,8 +15,9 @@ interface ControlsProps {
 /** On-screen D-pad for touch/mouse play, bound to the same ref-based input
  * state the keyboard listeners write to — so touch and keyboard merge for
  * free without the game loop needing to know which one is being used. */
-export function Controls({ inputRef, align = 'left', size = 40, spread = false }: ControlsProps) {
+export function Controls({ inputRef, tapsRef, align = 'left', size = 40, spread = false }: ControlsProps) {
   function set(key: keyof Input, value: boolean) {
+    if (value && tapsRef && (key === 'jump' || key === 'kick')) tapsRef.current[key] = true;
     inputRef.current = { ...inputRef.current, [key]: value };
   }
 

@@ -23,6 +23,7 @@ import { ClubOfferList } from './ClubOfferCard';
 import { CareerDashboardScreen } from './CareerDashboardScreen';
 import { EventSceneModal } from './EventSceneModal';
 import { CareerRetiredScreen } from './CareerRetiredScreen';
+import { AchievementToast } from './Achievements';
 
 interface CareerScreenProps {
   onBack: () => void;
@@ -30,14 +31,23 @@ interface CareerScreenProps {
 
 type Step = 'resume' | 'difficulty' | 'identity' | 'offer' | 'transferOffer' | 'dashboard' | 'retired';
 
-const NOTABLE_EVENT_TYPES: CareerEvent['type'][] = ['trophy', 'call_up', 'retirement', 'debut'];
+const NOTABLE_EVENT_TYPES: CareerEvent['type'][] = ['trophy', 'award', 'call_up', 'retirement', 'debut'];
 
 function filterEventsForDifficulty(events: CareerEvent[], difficulty: CareerDifficulty): CareerEvent[] {
   if (difficulty === 'intensa') return events;
   return events.filter((e) => NOTABLE_EVENT_TYPES.includes(e.type) || (e.type === 'injury' && e.severity === 'major'));
 }
 
-export function CareerScreen({ onBack }: CareerScreenProps) {
+export function CareerScreen(props: CareerScreenProps) {
+  return (
+    <>
+      <CareerFlow {...props} />
+      <AchievementToast />
+    </>
+  );
+}
+
+function CareerFlow({ onBack }: CareerScreenProps) {
   const [step, setStep] = useState<Step>('difficulty');
   const [careerState, setCareerState] = useState<CareerPlayerState | null>(null);
   const [pendingIdentity, setPendingIdentity] = useState<CareerIdentity | null>(null);

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import type { HeadSoccerSessionRow } from '../lib/headSoccerSession';
-import type { GameState, Input } from '../lib/headSoccer/types';
+import { withTaps, type GameState, type Input, type InputTaps } from '../lib/headSoccer/types';
 import { HEAD_SOCCER_ONLINE } from '../config/gameConfig';
 
 /** Realtime sync for a Head Soccer online room: lobby state (who joined,
@@ -16,6 +16,7 @@ export function useHeadSoccerSession(sessionId: string | null) {
   const [connected, setConnected] = useState(false);
   const remoteInputRef = useRef<Input>({ left: false, right: false, jump: false, kick: false });
   const remoteStateRef = useRef<GameState | null>(null);
+  const remoteTapsRef = useRef<InputTaps>({});
   const lastSentInputRef = useRef<Input | null>(null);
   const lastSentInputAtRef = useRef(0);
   const lastHeardRef = useRef(0);
@@ -68,7 +69,11 @@ export function useHeadSoccerSession(sessionId: string | null) {
 
     channel
       .on('broadcast', { event: 'input' }, ({ payload }) => {
-        remoteInputRef.current = payload as Input;
+        const input = payload as Input;
+        // a press and its release can arrive together: remember the press until a tick has used it
+        if (input.jump) remoteTapsRef.current.jump = true;
+        if (input.kick) remoteTapsRef.current.kick = true;
+        remoteInputRef.current = input;
         lastHeardRef.current = Date.now();
       })
       .on('broadcast', { event: 'state' }, ({ payload }) => {
@@ -110,6 +115,13 @@ export function useHeadSoccerSession(sessionId: string | null) {
     matchChannelRef.current?.send({ type: 'broadcast', event: 'input', payload: input });
   }
 
+  /** Host only: the guest's keys for the next tick, including a tap that already ended. */
+  function takeRemoteInput(): Input {
+    const input = withTaps(remoteInputRef.current, remoteTapsRef.current);
+    remoteTapsRef.current = {};
+    return input;
+  }
+
   /** The host's authoritative snapshot, for the guest to correct itself with. */
   function sendState(state: GameState) {
     matchChannelRef.current?.send({ type: 'broadcast', event: 'state', payload: state });
@@ -122,5 +134,5 @@ export function useHeadSoccerSession(sessionId: string | null) {
     return snapshot;
   }
 
-  return { session, loading, remoteInputRef, sendInput, sendState, takeRemoteState, connected };
+  return { session, loading, takeRemoteInput, sendInput, sendState, takeRemoteState, connected };
 }

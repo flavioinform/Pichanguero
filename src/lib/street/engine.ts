@@ -5,6 +5,7 @@
  * Team 0 attacks the right goal, team 1 the left one.
  */
 import { STREET } from '../../config/gameConfig';
+import type { Stats } from './team';
 
 export const COURT = { w: 800, h: 480, goalTop: 185, goalBottom: 295 };
 export const PLAYER_R = 14;
@@ -24,6 +25,8 @@ export interface StreetInput {
   switch: boolean;
   /** this human prefers to change player only by hand (the switch key), not automatically */
   manualSwitch: boolean;
+  /** sprint, held (Shift) */
+  sprint: boolean;
 }
 
 export interface StreetPlayer {
@@ -44,9 +47,41 @@ export interface StreetPlayer {
   tackleLockMs: number;
   /** on the floor after a caño: can't move, tackle or pick up the ball */
   stunMs: number;
+  /** estadísticas del jugador (1 a 5, el 3 es lo normal) */
+  skills: Stats;
+  /** pase o tiro en curso (null si no está pateando) */
+  kick: KickState | null;
   /** the current gambeta already put someone through a caño */
   canoDone: boolean;
+  /** which move the current trickMs belongs to: the usual burst, or a cola de vaca (drag-back turn) */
+  trickKind: 'gambeta' | 'cola';
+  /** aire para el sprint: 0 a 1 */
+  stamina: number;
+  /** sprinting right now */
+  sprinting: boolean;
+  /** barrida en curso: lo que falta (deslizarse y después levantarse), su dirección, y si ya tocó la pelota */
+  slideMs: number;
+  slideCd: number;
+  slideDx: number;
+  slideDy: number;
+  slideDone: boolean;
   aiMs: number;
+}
+
+/** Un pase o un tiro en curso: la preparación, el contacto (cuando sale la pelota) y el final del movimiento. */
+export interface KickState {
+  kind: 'pass' | 'shot';
+  /** milisegundos desde que empezó */
+  ms: number;
+  /** en qué milisegundo la pierna toca la pelota */
+  contactMs: number;
+  /** ya pateó */
+  done: boolean;
+  aimX: number;
+  aimY: number;
+  aimDy: number;
+  aimError: number;
+  power: number;
 }
 
 export interface StreetPopup {
@@ -68,8 +103,12 @@ export interface StreetState {
   controlled: [number, number];
   score: [number, number];
   clockMs: number;
-  phase: 'playing' | 'goal' | 'ended';
+  phase: 'intro' | 'playing' | 'goal' | 'ended';
+  /** milisegundos que le quedan a la fase actual (goal e intro) */
   phaseMs: number;
+  /** la intro larga de inicio o la corta de después de un gol */
+  introKind: 'match' | 'restart';
+  introTotalMs: number;
   lastScorer: 0 | 1 | null;
   winner: 0 | 1 | 'draw' | null;
   difficulty: Difficulty;
@@ -107,7 +146,7 @@ export function withTaps(input: StreetInput, taps: Taps): StreetInput {
 }
 
 export function emptyStreetInput(): StreetInput {
-  return { left: false, right: false, up: false, down: false, pass: false, shoot: false, trick: false, switch: false, manualSwitch: false };
+  return { left: false, right: false, up: false, down: false, pass: false, shoot: false, trick: false, switch: false, manualSwitch: false, sprint: false };
 }
 
 const HOME: Array<[number, number]> = [
@@ -127,6 +166,9 @@ function newPlayer(team: 0 | 1, role: 0 | 1 | 2): StreetPlayer {
     x, y, vx: 0, vy: 0, team, role,
     fx: team === 0 ? 1 : -1, fy: 0,
     trickMs: 0, trickCd: 0, pickupCd: 0, tackleMs: 0, tackleLockMs: 0, stunMs: 0, canoDone: false, aiMs: 0,
+    trickKind: 'gambeta', stamina: 1, sprinting: false, slideMs: 0, slideCd: 0, slideDx: 1, slideDy: 0, slideDone: false,
+    skills: { speed: 3, dribble: 3, shot: 3, pass: 3 },
+    kick: null,
   };
 }
 
@@ -135,18 +177,26 @@ export function createStreetState(
   targetGoals: number,
   clockMs: number,
   /** true: one human, on team 0. false: nobody. Or say it per team. */
-  humans: boolean | [boolean, boolean] = true
+  humans: boolean | [boolean, boolean] = true,
+  /** false: el partido arranca de una, sin la animación de inicio (simulaciones y pruebas) */
+  withIntro = true,
+  /** estadísticas de los jugadores de cada equipo, en orden (si no se pasan, todos son normales) */
+  skills?: [Stats[], Stats[]]
 ): StreetState {
   const teams: [boolean, boolean] = Array.isArray(humans) ? humans : [humans, false];
+  const players = [newPlayer(0, 0), newPlayer(0, 1), newPlayer(0, 2), newPlayer(1, 0), newPlayer(1, 1), newPlayer(1, 2)];
+  if (skills) players.forEach((p, i) => (p.skills = { ...(skills[i < 3 ? 0 : 1][i % 3] ?? p.skills) }));
   return {
-    players: [newPlayer(0, 0), newPlayer(0, 1), newPlayer(0, 2), newPlayer(1, 0), newPlayer(1, 1), newPlayer(1, 2)],
+    players,
     ball: { x: COURT.w / 2, y: COURT.h / 2, vx: 0, vy: 0 },
     holder: 1,
     controlled: [teams[0] ? 1 : -1, teams[1] ? 4 : -1],
     score: [0, 0],
     clockMs,
-    phase: 'playing',
-    phaseMs: 0,
+    phase: withIntro ? 'intro' : 'playing',
+    phaseMs: withIntro ? STREET.intro.matchMs : 0,
+    introKind: 'match',
+    introTotalMs: STREET.intro.matchMs,
     lastScorer: null,
     winner: null,
     difficulty,
@@ -186,6 +236,9 @@ interface Intent {
   pass: boolean;
   shoot: boolean;
   trick: boolean;
+  /** tirarse a barrer (sin la pelota) */
+  slide: boolean;
+  sprint: boolean;
 }
 
 function popup(s: StreetState, team: 0 | 1, text: string, x: number, y: number): void {
@@ -216,7 +269,7 @@ function goalX(team: 0 | 1): number {
 function kickoff(s: StreetState, kickingTeam: 0 | 1): void {
   s.players.forEach((p) => {
     const [x, y] = homeOf(p.team, p.role);
-    Object.assign(p, { x, y, vx: 0, vy: 0, trickMs: 0, tackleMs: 0, tackleLockMs: 0, pickupCd: 0, stunMs: 0, canoDone: false });
+    Object.assign(p, { x, y, vx: 0, vy: 0, trickMs: 0, tackleMs: 0, tackleLockMs: 0, pickupCd: 0, stunMs: 0, canoDone: false, kick: null, slideMs: 0, sprinting: false, stamina: Math.max(p.stamina, 0.6) });
     p.fx = p.team === 0 ? 1 : -1;
     p.fy = 0;
   });
@@ -259,6 +312,8 @@ function pickPassTarget(s: StreetState, i: number, aimX: number, aimY: number): 
   return best;
 }
 
+const statFactor = (points: number, perPoint: number): number => 1 + (points - 3) * perPoint;
+
 function doPass(s: StreetState, i: number, aimX: number, aimY: number): void {
   const p = s.players[i];
   const j = pickPassTarget(s, i, aimX, aimY);
@@ -268,7 +323,7 @@ function doPass(s: StreetState, i: number, aimX: number, aimY: number): void {
   const tx = m.x + m.vx * lead;
   const ty = m.y + m.vy * lead;
   const d = dist(p.x, p.y, tx, ty);
-  const power = Math.min(STREET.passPowerMax, Math.max(STREET.passPowerMin, d * 1.6 + 200));
+  const power = Math.min(STREET.passPowerMax, Math.max(STREET.passPowerMin, d * 1.6 + 200)) * statFactor(p.skills.pass, STREET.stats.passPerPoint);
   kick(s, i, tx - p.x, ty - p.y, power);
   if (s.humans[p.team]) s.controlled[p.team] = j;
 }
@@ -279,7 +334,7 @@ function doShoot(s: StreetState, i: number, aimDy: number, aimError: number, pow
   const mid = (COURT.goalTop + COURT.goalBottom) / 2;
   const crack = s.crackMs[p.team] > 0;
   const ty = mid + aimDy * 55 + (crack ? 0 : (rand(s) - 0.5) * aimError);
-  kick(s, i, gx - p.x, ty - p.y, STREET.shotPower * power * (crack ? STREET.crack.shotBoost : 1));
+  kick(s, i, gx - p.x, ty - p.y, STREET.shotPower * power * statFactor(p.skills.shot, STREET.stats.shotPerPoint) * (crack ? STREET.crack.shotBoost : 1));
 }
 
 function aiIntent(s: StreetState, i: number): Intent {
@@ -287,7 +342,7 @@ function aiIntent(s: StreetState, i: number): Intent {
   const p = s.players[i];
   const atk = p.team === 0 ? 1 : -1;
   const gx = goalX(p.team);
-  const intent: Intent = { dx: 0, dy: 0, pass: false, shoot: false, trick: false };
+  const intent: Intent = { dx: 0, dy: 0, pass: false, shoot: false, trick: false, slide: false, sprint: false };
   const opponents = s.players.filter((o) => o.team !== p.team);
   const decide = p.aiMs <= 0;
   if (decide) p.aiMs = cfg.decisionMs * (0.7 + rand(s) * 0.6);
@@ -300,9 +355,22 @@ function aiIntent(s: StreetState, i: number): Intent {
       .sort((a, b) => dist(a.x, a.y, p.x, p.y) - dist(b.x, b.y, p.x, p.y))[0];
     if (near) ty = p.y + (p.y >= near.y ? 90 : -90);
     [intent.dx, intent.dy] = unit(tx - p.x, ty - p.y);
+    // en plena cola de vaca sigue saliendo para donde arrancó
+    if (p.trickMs > 0 && p.trickKind === 'cola') {
+      [intent.dx, intent.dy] = unit(p.vx, p.vy, p.fx, p.fy);
+      return intent;
+    }
+    // campo libre adelante: a fondo
+    intent.sprint = !near && p.stamina > STREET.sprint.cpuMin;
     const inRange = Math.abs(gx - p.x) < cfg.shootRange;
+    const front = near && (near.x - p.x) * p.fx + (near.y - p.y) * p.fy > 0;
     if (decide && inRange) intent.shoot = true;
-    else if (near && p.trickCd <= 0 && dist(near.x, near.y, p.x, p.y) < 34 && rand(s) < 0.04) {
+    else if (decide && near && front && p.trickCd <= 0 && dist(near.x, near.y, p.x, p.y) < 40 && rand(s) < 0.3) {
+      // cola de vaca: lo encara, la pisa y sale para atrás y al costado
+      const side = p.y > COURT.h / 2 ? -1 : 1;
+      [intent.dx, intent.dy] = unit(-p.fx - p.fy * side * 0.6, -p.fy + p.fx * side * 0.6);
+      intent.trick = true;
+    } else if (near && p.trickCd <= 0 && dist(near.x, near.y, p.x, p.y) < 34 && rand(s) < 0.04) {
       // go straight at the rival: a gambeta now is a caño
       [intent.dx, intent.dy] = unit(near.x - p.x, near.y - p.y);
       intent.trick = true;
@@ -345,6 +413,18 @@ function aiIntent(s: StreetState, i: number): Intent {
   ty = Math.max(PLAYER_R, Math.min(COURT.h - PLAYER_R, ty));
   const d = dist(p.x, p.y, tx, ty);
   if (d > 10) [intent.dx, intent.dy] = unit(tx - p.x, ty - p.y);
+  // lejos de donde tiene que estar: sprint
+  intent.sprint = d > 130 && p.stamina > STREET.sprint.cpuMin;
+  // barrida: el rival que lleva la pelota viene cerca y de frente (de atrás sería falta)
+  if (decide && holderP && holderP.team !== p.team && p.slideCd <= 0) {
+    const dh = dist(p.x, p.y, holderP.x, holderP.y);
+    const [ux, uy] = unit(holderP.x - p.x, holderP.y - p.y);
+    const headOn = ux * holderP.fx + uy * holderP.fy < 0;
+    if (dh > 26 && dh < 62 && headOn && holderP.trickMs <= 0 && rand(s) < cfg.slideChance) {
+      intent.slide = true;
+      [intent.dx, intent.dy] = [ux, uy];
+    }
+  }
   // a loose ball that is right at the feet: take a swing at goal
   if (!holderP && decide && dist(p.x, p.y, s.ball.x, s.ball.y) < 26 && Math.abs(gx - p.x) < cfg.shootRange) intent.shoot = true;
   return intent;
@@ -358,6 +438,9 @@ function humanIntent(input: StreetInput, prev: StreetInput): Intent {
     // the shot loads while the key is held and goes off on release
     shoot: !input.shoot && prev.shoot,
     trick: input.trick && !prev.trick,
+    // sin la pelota, apretar K es barrida (se decide en stepStreet, que sabe quién la tiene)
+    slide: input.shoot && !prev.shoot,
+    sprint: input.sprint,
   };
 }
 
@@ -419,6 +502,47 @@ function endIfOver(s: StreetState): void {
   }
 }
 
+/**
+ * La barrida de `i` llega a la pelota. Al que la lleva se la saca y lo deja en
+ * el piso, salvo que esté gambeteando (la esquiva) o que la barrida venga de
+ * atrás (falta: se queda con la pelota). Una pelota suelta, la desvía.
+ */
+function slideContact(s: StreetState, i: number): void {
+  const p = s.players[i];
+  const sl = STREET.slide;
+  // los pies van adelante
+  const footX = p.x + p.slideDx * PLAYER_R;
+  const footY = p.y + p.slideDy * PLAYER_R;
+  if (dist(footX, footY, s.ball.x, s.ball.y) > sl.reachPx + BALL_R) return;
+  if (s.holder >= 0) {
+    const h = s.players[s.holder];
+    if (h.team === p.team || h.trickMs > 0) return;
+    p.slideDone = true;
+    if (p.slideDx * h.fx + p.slideDy * h.fy > -sl.fromBehindDot) {
+      popup(s, h.team, '¡Falta!', h.x, h.y);
+      return;
+    }
+    h.stunMs = sl.victimStunMs;
+    h.pickupCd = STREET.tackledPickupCdMs;
+    h.tackleLockMs = STREET.tackleLockMs;
+    h.kick = null;
+    addStyle(s, h.team, -STREET.style.robbed);
+    addStyle(s, p.team, sl.style);
+    popup(s, p.team, '¡Barrida!', h.x, h.y);
+  } else {
+    p.slideDone = true;
+  }
+  s.holder = -1;
+  s.ball.vx = p.slideDx * sl.pokePower + p.vx * 0.2;
+  s.ball.vy = p.slideDy * sl.pokePower + p.vy * 0.2;
+  s.players.forEach((q) => (q.tackleMs = 0));
+}
+
+/** Salta la animación de inicio: el partido empieza en el próximo paso. */
+export function skipStreetIntro(s: StreetState): void {
+  if (s.phase === 'intro') s.phaseMs = 0;
+}
+
 /** `input` is team 0's human, or one input per team when both sides are played by people. */
 export function stepStreet(s: StreetState, input: StreetInput | [StreetInput, StreetInput], dtMs: number): void {
   if (s.phase === 'ended') return;
@@ -433,8 +557,29 @@ export function stepStreet(s: StreetState, input: StreetInput | [StreetInput, St
         if (s.authoritative) endIfOver(s);
       } else {
         kickoff(s, s.lastScorer === 0 ? 1 : 0);
-        s.phase = 'playing';
+        // después de cada gol, la versión corta de la animación de inicio
+        s.phase = 'intro';
+        s.introKind = 'restart';
+        s.introTotalMs = STREET.intro.restartMs;
+        s.phaseMs = STREET.intro.restartMs;
       }
+    }
+    return;
+  }
+
+  if (s.phase === 'intro') {
+    // durante la intro no corre el reloj ni responden los controles
+    s.phaseMs -= dtMs;
+    s.popups = s.popups.filter((q) => (q.ms -= dtMs) > 0);
+    s.chargeMs = [0, 0];
+    // lo que se mantenga apretado al arrancar no dispara nada: el tiro cargado empieza de cero
+    s.prev = [
+      { ...inputs[0], shoot: false },
+      { ...inputs[1], shoot: false },
+    ];
+    if (s.phaseMs <= 0) {
+      s.phase = 'playing';
+      s.phaseMs = 0;
     }
     return;
   }
@@ -456,56 +601,137 @@ export function stepStreet(s: StreetState, input: StreetInput | [StreetInput, St
     p.pickupCd = Math.max(0, p.pickupCd - dtMs);
     p.tackleLockMs = Math.max(0, p.tackleLockMs - dtMs);
     p.stunMs = Math.max(0, p.stunMs - dtMs);
+    p.slideCd = Math.max(0, p.slideCd - dtMs);
+    p.slideMs = Math.max(0, p.slideMs - dtMs);
 
     const human = i === s.controlled[p.team];
     const intent = human ? humanIntent(inputs[p.team], s.prev[p.team]) : aiIntent(s, i);
-    if (p.stunMs > 0) Object.assign(intent, { dx: 0, dy: 0, pass: false, shoot: false, trick: false });
+    // en el piso (caño o barrida) no se decide nada
+    if (p.stunMs > 0 || p.slideMs > 0) Object.assign(intent, { dx: 0, dy: 0, pass: false, shoot: false, trick: false, slide: false, sprint: false });
     const aimError = human ? STREET.humanAimError : cfg.aimErr;
 
     const [mx, my] = unit(intent.dx, intent.dy, 0, 0);
     const moving = mx !== 0 || my !== 0;
-    if (moving) {
+    // cola de vaca: la gambeta pedida hacia atrás de donde mira (se mide antes de girar)
+    const backwards = moving && mx * p.fx + my * p.fy < STREET.cola.backDot;
+    if (moving && p.trickMs > 0 && p.trickKind === 'cola') {
+      // en la cola de vaca gira con la pelota pegada: la arrastra alrededor del cuerpo
+      let diff = Math.atan2(my, mx) - Math.atan2(p.fy, p.fx);
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      const a = Math.atan2(p.fy, p.fx) + Math.max(-18 * dt, Math.min(18 * dt, diff));
+      [p.fx, p.fy] = [Math.cos(a), Math.sin(a)];
+    } else if (moving) {
       p.fx += (mx - p.fx) * Math.min(1, 14 * dt);
       p.fy += (my - p.fy) * Math.min(1, 14 * dt);
       [p.fx, p.fy] = unit(p.fx, p.fy);
     }
 
+    // barrida: sin la pelota en el equipo, y sin una pelota suelta a los pies (eso es volea)
+    const looseAtFeet = s.holder < 0 && dist(p.x, p.y, s.ball.x, s.ball.y) < PLAYER_R + BALL_R + 24;
+    const ownBall = s.holder >= 0 && s.players[s.holder].team === p.team;
+    if (intent.slide && !ownBall && !looseAtFeet && p.slideCd <= 0 && !p.kick) {
+      const sl = STREET.slide;
+      [p.slideDx, p.slideDy] = moving ? [mx, my] : [p.fx, p.fy];
+      [p.fx, p.fy] = [p.slideDx, p.slideDy];
+      p.slideMs = sl.moveMs + sl.getUpMs;
+      p.slideCd = sl.cooldownMs + sl.moveMs + sl.getUpMs;
+      p.slideDone = false;
+      p.sprinting = false;
+      // tirado no puede agarrar la pelota; se la queda un compañero o la levanta al pararse
+      p.pickupCd = sl.moveMs + sl.getUpMs;
+    }
+
     if (intent.trick && p.trickCd <= 0) {
-      p.trickMs = STREET.trickMs;
-      p.trickCd = STREET.trickCooldownMs;
-      p.canoDone = false;
-      const rivalClose = s.players.some((o) => o.team !== p.team && dist(o.x, o.y, p.x, p.y) < STREET.style.rivalNearPx);
-      if (s.holder === i && rivalClose) {
-        addStyle(s, p.team, STREET.style.trickPastRival);
-        popup(s, p.team, '¡Gambeta!', p.x, p.y);
-      }
-      if (moving) {
-        p.vx = mx * STREET.speed * STREET.trickBoost;
-        p.vy = my * STREET.speed * STREET.trickBoost;
+      p.trickCd = STREET.trickCooldownMs * (1 - (p.skills.dribble - 3) * STREET.stats.trickCdPerPoint);
+      const rivalClose = s.players.filter((o) => o.team !== p.team && dist(o.x, o.y, p.x, p.y) < STREET.style.rivalNearPx);
+      if (s.holder === i && backwards) {
+        // la pisa, la arrastra para atrás y sale para el otro lado: el que lo encaraba queda pagando
+        p.trickKind = 'cola';
+        p.trickMs = STREET.cola.ms;
+        p.canoDone = true;
+        p.vx = mx * STREET.speed * STREET.cola.boost;
+        p.vy = my * STREET.speed * STREET.cola.boost;
+        for (const o of rivalClose) {
+          o.tackleLockMs = Math.max(o.tackleLockMs, STREET.cola.rivalLockMs);
+          o.tackleMs = 0;
+        }
+        if (rivalClose.length) {
+          addStyle(s, p.team, STREET.cola.style);
+          popup(s, p.team, '¡Cola de vaca!', p.x, p.y);
+        }
+      } else {
+        p.trickKind = 'gambeta';
+        p.trickMs = STREET.trickMs;
+        p.canoDone = false;
+        if (s.holder === i && rivalClose.length) {
+          addStyle(s, p.team, STREET.style.trickPastRival);
+          popup(s, p.team, '¡Gambeta!', p.x, p.y);
+        }
+        if (moving) {
+          p.vx = mx * STREET.speed * STREET.trickBoost;
+          p.vy = my * STREET.speed * STREET.trickBoost;
+        }
       }
     }
 
-    const crackBoost = s.crackMs[p.team] > 0 ? STREET.crack.speedBoost : 1;
-    const base = (human ? STREET.speed : STREET.speed * cfg.speed) * (s.holder === i ? STREET.carrierSlow : 1) * crackBoost;
-    const top = p.trickMs > 0 ? base * STREET.trickBoost : base;
-    p.vx += (mx * top - p.vx) * Math.min(1, STREET.accel * dt);
-    p.vy += (my * top - p.vy) * Math.min(1, STREET.accel * dt);
+    // sprint: gasta aire; sin aire no arranca uno nuevo
+    const sp = STREET.sprint;
+    p.sprinting = intent.sprint && moving && !p.kick && (p.sprinting ? p.stamina > 0 : p.stamina > sp.minToStart);
+    p.stamina = p.sprinting ? Math.max(0, p.stamina - dt / sp.drainS) : Math.min(1, p.stamina + dt / sp.regenS);
+
+    if (p.slideMs > 0) {
+      // barriendo: sale disparado y se va frenando; al final se levanta quieto
+      const sl = STREET.slide;
+      const sliding = p.slideMs - sl.getUpMs;
+      const v = sliding > 0 ? STREET.speed * sl.boost * Math.min(1, sliding / sl.moveMs + 0.25) : 0;
+      p.vx = p.slideDx * v;
+      p.vy = p.slideDy * v;
+    } else {
+      const crackBoost = s.crackMs[p.team] > 0 ? STREET.crack.speedBoost : 1;
+      const base = (human ? STREET.speed : STREET.speed * cfg.speed) * (s.holder === i ? STREET.carrierSlow : 1) * crackBoost * statFactor(p.skills.speed, STREET.stats.speedPerPoint);
+      const burst = p.trickMs > 0 ? (p.trickKind === 'cola' ? STREET.cola.boost : STREET.trickBoost) : 1;
+      const top = base * burst * (p.sprinting ? sp.boost : 1) * (p.kick && !p.kick.done ? STREET.kick.windupSlow : 1);
+      p.vx += (mx * top - p.vx) * Math.min(1, STREET.accel * dt);
+      p.vy += (my * top - p.vy) * Math.min(1, STREET.accel * dt);
+    }
     p.x = Math.max(PLAYER_R, Math.min(COURT.w - PLAYER_R, p.x + p.vx * dt));
     p.y = Math.max(PLAYER_R, Math.min(COURT.h - PLAYER_R, p.y + p.vy * dt));
 
+    // la barrida llega a la pelota
+    if (p.slideMs > STREET.slide.getUpMs && !p.slideDone) slideContact(s, i);
+
     // actions
     const nearBall = s.holder < 0 && dist(p.x, p.y, s.ball.x, s.ball.y) < PLAYER_R + BALL_R + 14 && p.pickupCd <= 0;
-    if (s.holder === i || nearBall) {
+    const startKick = (kind: KickState['kind'], params: Partial<KickState>) => {
+      const contactMs = kind === 'shot' ? STREET.kick.shotWindupMs : STREET.kick.passWindupMs;
+      p.kick = { kind, ms: 0, contactMs, done: false, aimX: 0, aimY: 0, aimDy: 0, aimError: 0, power: 1, ...params };
+    };
+    if (p.kick) {
+      // un pase o tiro en curso: la pelota sale recién en el contacto
+      p.kick.ms += dtMs;
+      if (!p.kick.done && s.holder !== i) p.kick = null; // le quitaron la pelota en la preparación
+      else if (!p.kick.done && p.kick.ms >= p.kick.contactMs) {
+        p.kick.done = true;
+        if (p.kick.kind === 'shot') doShoot(s, i, p.kick.aimDy, p.kick.aimError, p.kick.power);
+        else doPass(s, i, p.kick.aimX, p.kick.aimY);
+      }
+      if (p.kick && p.kick.ms >= p.kick.contactMs + STREET.kick.followMs) p.kick = null;
+    } else if (s.holder === i || nearBall) {
       if (intent.shoot) {
         // the CPU aims for the side of the goal the rival's last man has left open
         const guard = s.players.find((o) => o.team !== p.team && o.role === 0);
         const mid = (COURT.goalTop + COURT.goalBottom) / 2;
         const cpuAim = guard && guard.y > mid ? -0.7 : 0.7;
-        doShoot(s, i, human ? intent.dy : cpuAim, aimError, human ? chargePower[p.team] : 1);
-      }
-      else if (intent.pass && s.holder === i) {
+        const params = { aimDy: human ? intent.dy : cpuAim, aimError, power: human ? chargePower[p.team] : 1 };
+        if (s.holder === i) startKick('shot', params);
+        else {
+          // de volea, a una pelota suelta: no hay tiempo de preparar, el contacto es ya
+          doShoot(s, i, params.aimDy, params.aimError, params.power);
+          startKick('shot', { ...params, ms: STREET.kick.shotWindupMs, done: true });
+        }
+      } else if (intent.pass && s.holder === i) {
         const [ax, ay] = moving ? [mx, my] : [p.fx, p.fy];
-        doPass(s, i, ax, ay);
+        startKick('pass', { aimX: ax, aimY: ay });
       }
     }
   });
@@ -549,9 +775,12 @@ export function stepStreet(s: StreetState, input: StreetInput | [StreetInput, St
         addStyle(s, h.team, STREET.style.cano);
         popup(s, h.team, '¡CAÑO!', o.x, o.y);
       }
-      const touching = contact && h.trickMs <= 0 && o.tackleLockMs <= 0 && o.stunMs <= 0;
+      // durante la gambeta y durante la preparación de un pase o tiro no se puede quitar: la jugada ya está jugada
+      const kicking = !!h.kick && !h.kick.done;
+      const touching = contact && h.trickMs <= 0 && !kicking && o.tackleLockMs <= 0 && o.stunMs <= 0 && o.slideMs <= 0;
       o.tackleMs = touching ? o.tackleMs + dtMs : Math.max(0, o.tackleMs - dtMs * 2);
-      if (o.tackleMs >= cfg.tackleMs) {
+      // un buen regateador es más difícil de marcar
+      if (o.tackleMs >= cfg.tackleMs * Math.max(0.4, 1 + (h.skills.dribble - 3) * STREET.stats.tackleResistPerPoint)) {
         h.pickupCd = STREET.tackledPickupCdMs;
         h.tackleLockMs = STREET.tackleLockMs;
         addStyle(s, h.team, -STREET.style.robbed);

@@ -6,6 +6,8 @@
  * is a self-contained engine whose constants only make sense together, and
  * layout pixel sizes stay next to the component that draws them.
  */
+import type { BoneKey } from '../components/street/characters/bonePoser';
+import type { ColorKeyConfig } from '../components/street/characters/looks';
 
 export const APP = {
   /** length of the logo splash before the menu shows */
@@ -111,13 +113,175 @@ export const STREET = {
     goalValue: 2,
   },
   popupMs: 1100,
+  /** pase y tiro tienen una preparación: la pelota sale en el "contacto", el mismo instante en que la animación le pega */
+  kick: {
+    passWindupMs: 90,
+    shotWindupMs: 140,
+    /** cuánto sigue la animación después del contacto */
+    followMs: 260,
+    /** durante la preparación el jugador se frena un poco */
+    windupSlow: 0.85,
+  },
+  /** cuánto cambia el juego por cada punto de estadística (el 3 es el valor "normal") */
+  stats: {
+    /** velocidad: ±1,2 % de velocidad por punto */
+    speedPerPoint: 0.012,
+    /** tiro: ±3 % de potencia por punto */
+    shotPerPoint: 0.03,
+    /** pase: ±3 % de potencia por punto */
+    passPerPoint: 0.03,
+    /** regate: a quien lo marca le cuesta un 6 % más (o menos) quitarle la pelota por punto */
+    tackleResistPerPoint: 0.06,
+    /** regate: la gambeta se recarga un 5 % más rápido (o lento) por punto */
+    trickCdPerPoint: 0.05,
+  },
+  /** animación de inicio. Todos los tiempos en milisegundos desde que empieza. */
+  intro: {
+    /** duración total al empezar o reiniciar el partido */
+    matchMs: 7600,
+    /** versión corta, después de cada gol */
+    restartMs: 2500,
+    /** en la versión corta, cuánto dura "¡LISTOS!" antes de "¡YA!" */
+    restartReadyMs: 1500,
+    /** los jugadores entran trotando desde su arco; cada uno sale un poco después del anterior */
+    entry: { startMs: 1400, endMs: 3600, staggerMs: 220 },
+    /** saludo de cada equipo, parados en el centro */
+    greet: { startMs: 3600, endMs: 4500 },
+    /** vuelta trotando a la posición de saque */
+    back: { startMs: 4500, endMs: 5700 },
+    /** las tarjetas con nombre y número */
+    cards: { startMs: 1700, endMs: 4500, staggerMs: 220 },
+    /** cuenta regresiva: 3, 2, 1 y la salida, un cartel cada beatMs */
+    countdown: { startMs: 4600, beatMs: 750 },
+    /** cuánto tarda la cámara en acomodarse a la de juego si se salta la intro */
+    skipSettleMs: 700,
+  },
   /** hold the shoot key to load the shot; it goes off on release */
   charge: { maxMs: 800, minPower: 0.8, maxPower: 1.35 },
-  difficulty: {
-    easy: { speed: 0.85, aimErr: 120, tackleMs: 440, decisionMs: 650, shootRange: 230 },
-    normal: { speed: 0.95, aimErr: 70, tackleMs: 310, decisionMs: 450, shootRange: 260 },
-    hard: { speed: 1.05, aimErr: 45, tackleMs: 220, decisionMs: 300, shootRange: 290 },
+  /** sprint (Shift): más rápido mientras dure el aire; se recarga sin correr a fondo */
+  sprint: {
+    boost: 1.3,
+    /** segundos de sprint con el aire lleno */
+    drainS: 3,
+    /** segundos para recargar el aire de cero a lleno */
+    regenS: 4.5,
+    /** con menos aire que esto no arranca un sprint nuevo (el que viene corriendo sigue hasta vaciarlo) */
+    minToStart: 0.2,
+    /** la CPU solo sprinta con al menos este aire */
+    cpuMin: 0.45,
   },
+  /** barrida (K sin la pelota): se tira al piso hacia adelante; si llega a la pelota se la saca al que la lleva */
+  slide: {
+    /** cuánto dura el deslizamiento y cuánto tarda en levantarse después */
+    moveMs: 420,
+    getUpMs: 330,
+    /** velocidad de salida (multiplica a la velocidad normal); después se va frenando */
+    boost: 1.85,
+    cooldownMs: 1500,
+    /** distancia a la pelota a la que la barrida la alcanza */
+    reachPx: 30,
+    /** con qué fuerza sale la pelota de la barrida */
+    pokePower: 240,
+    /** el que pierde la pelota queda en el piso este tiempo */
+    victimStunMs: 650,
+    /** de atrás no vale: la barrida que llega por la espalda es falta y el barrido se queda con la pelota */
+    fromBehindDot: -0.35,
+    style: 12,
+  },
+  /** cola de vaca (gambeta tirando hacia atrás): pisa la pelota, la arrastra y sale para el otro lado */
+  cola: {
+    ms: 420,
+    /** salida en la dirección nueva */
+    boost: 1.35,
+    /** qué tan opuesta tiene que ser la dirección a donde mira (-1 = justo atrás) */
+    backDot: -0.25,
+    /** el rival que te encaraba queda pagando: no puede quitar por este tiempo */
+    rivalLockMs: 700,
+    style: 18,
+  },
+  difficulty: {
+    easy: { speed: 0.85, aimErr: 120, tackleMs: 440, decisionMs: 650, shootRange: 230, slideChance: 0.08 },
+    normal: { speed: 0.95, aimErr: 70, tackleMs: 310, decisionMs: 450, shootRange: 260, slideChance: 0.16 },
+    hard: { speed: 1.05, aimErr: 45, tackleMs: 220, decisionMs: 300, shootRange: 290, slideChance: 0.25 },
+  },
+};
+
+/** El personaje 3D de POTRERO. Si el .glb no está, se usa el jugador armado por código. */
+export const STREET_CHARACTER = {
+  /**
+   * El modelo se busca solo: dejá el archivo en src/assets/models/jugador.glb y listo.
+   * Si preferís otra ubicación (por ejemplo public/models/), poné acá su ruta: '/models/mi-jugador.glb'.
+   */
+  modelUrl: null as string | null,
+  /** altura a la que se escala el modelo, en metros (después se aplica la altura y contextura de cada jugador) */
+  heightM: 1.8,
+  /** segundos que tarda en mezclarse una animación con la siguiente */
+  crossFadeS: 0.2,
+  /** a qué velocidad real (m/s) los clips de trote y carrera se ven "a velocidad normal"; más rápido o lento acelera o frena el clip */
+  trotSpeed: 3.0,
+  sprintSpeed: 6.2,
+  /** por debajo de esta velocidad está parado; por encima de la otra, corre en vez de trotar */
+  idleBelow: 0.35,
+  sprintAbove: 4.4,
+  /** en qué fracción de los clips pass y shot el pie toca la pelota (0 = al empezar, 1 = al terminar) */
+  kickContact: { pass: 0.4, shot: 0.45 },
+  /** qué hueso lleva el número de la espalda (se busca un hueso cuyo nombre contenga esto) */
+  numberBone: 'spine01',
+
+  /*
+   * Adaptación al modelo que tengas. Los valores de abajo son para el que viene
+   * puesto: "man base character (rigged)" de grab3d.com (CC0 según los datos del
+   * propio archivo), reducido a 15 mil triángulos. Trae solo los clips walk y
+   * run: lo demás (quieto, patada, gambeta, caída, festejos, saludos) lo arma
+   * characters/bonePoser.ts moviendo los huesos.
+   */
+  /** nombres de los clips del modelo para cada animación del juego (se usa el primero que exista) */
+  clipNames: {
+    trot: ['walk'],
+    sprint: ['run'],
+  } as Record<string, string[]>,
+  /** mallas del modelo que no se muestran (armas, capa...) */
+  hideMeshes: [] as string[],
+  /** si el modelo no tiene materiales con los nombres de types.ts, qué malla se pinta con qué: jersey, shorts, socks, skin, hair o shoes */
+  meshSlots: {} as Record<string, string>,
+  /** cuánto tiñe el color del equipo a una malla con textura (0 = nada, 1 = todo el color) */
+  tintStrength: 0.7,
+  /**
+   * Para un modelo de una sola textura con ropa gris: en qué franjas de altura
+   * (0 = pies, 1 = cabeza) están la remera y el short, para pintarlos con los
+   * colores del equipo. null = no recolorear.
+   */
+  colorKey: {
+    jersey: [0.512, 0.87],
+    shorts: [0.3, 0.512],
+    maxSat: 0.48,
+    jerseyRef: 0.3,
+    shortsRef: 0.04,
+    skinRef: 0.3,
+    hairRef: 0.03,
+    armX: 0.13,
+    hairFrom: 0.88,
+    hairLum: 0.06,
+    ankle: 0.065,
+    // short largo y medias altas se tocan en la rodilla (sin rayita de piel en el medio)
+    shortsBottom: { corto: 0.39, medio: 0.33, largo: 0.25 },
+    socksTop: { altas: 0.255, bajas: 0.11 },
+    beard: { from: 0.86, to: 0.892, depth: 0.05 },
+  } as ColorKeyConfig | null,
+  /** peinados 3D pegados al hueso de la cabeza (para un modelo con un solo pelo pintado); null = no ponerle */
+  hair: { headBone: 'Head', headTopBone: 'head_end' } as { headBone: string; headTopBone: string } | null,
+  /** radio de la cabeza = distancia entre esos dos huesos × esto */
+  hairScale: 0.385,
+  /** zapatillas 3D pegadas a los huesos de los pies (para un modelo descalzo); null = no ponerle */
+  shoes: { footBones: ['LeftFoot', 'RightFoot'], toeBones: ['LeftToeBase', 'RightToeBase'] } as { footBones: [string, string]; toeBones: [string, string] } | null,
+  /** huesos del esqueleto para las poses armadas por código (nombres estilo Mixamo) */
+  poseBones: {
+    hips: 'Hips', spineLow: 'Spine02', spineMid: 'Spine01', chest: 'Spine', neck: 'neck', head: 'Head',
+    armL: 'LeftArm', foreArmL: 'LeftForeArm', armR: 'RightArm', foreArmR: 'RightForeArm',
+    thighL: 'LeftUpLeg', shinL: 'LeftLeg', footL: 'LeftFoot', thighR: 'RightUpLeg', shinR: 'RightLeg', footR: 'RightFoot',
+  } as Record<BoneKey, string>,
+  /** cuánto bajar los brazos desde la pose de reposo del modelo (radianes; viene en "A") */
+  armsDown: 0.72,
 };
 
 export const STREET_ONLINE = {

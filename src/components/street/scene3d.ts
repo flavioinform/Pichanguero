@@ -8,11 +8,19 @@ import * as THREE from 'three';
 import { BALL_R, COURT, PLAYER_R } from '../../lib/street/engine';
 import type { StreetPlayer, StreetState } from '../../lib/street/engine';
 import { STREET } from '../../config/gameConfig';
+import { introElapsed } from '../../lib/street/intro';
+import { POSITION_SLOTS, readPositions } from '../../lib/street/positions';
+import type { StreetTeam } from '../../lib/street/team';
+import { createCharacter } from './characters/library';
+import type { CharacterLibrary } from './characters/gltfCharacter';
+import type { MotionState, StreetCharacter } from './characters/types';
 
-export interface TeamLook3d {
-  primary: string;
-  secondary: string;
-}
+const UP = new THREE.Vector3(0, 1, 0);
+import { blendCamera, introCameraAt, introPlayerPose, type CameraPose, type IntroPose } from './introCinematic';
+
+const newPose = (): CameraPose => ({ position: new THREE.Vector3(), look: new THREE.Vector3(), fov: 38 });
+const smoothstep = (t: number) => t * t * (3 - 2 * t);
+
 
 /** metres per engine pixel: the 800x480 court becomes 30x18 m */
 const K = 30 / COURT.w;
@@ -22,26 +30,12 @@ const GOAL_HALF = ((COURT.goalBottom - COURT.goalTop) * K) / 2;
 const GOAL_HEIGHT = 2;
 const GOAL_DEPTH = 1.3;
 const BALL_RADIUS = BALL_R * K * 0.62;
-/** players are drawn a little larger than life so they read well from the TV camera */
-const PLAYER_SCALE = 1.22;
 const toX = (x: number) => (x - COURT.w / 2) * K;
-/** positions are packed as [x0, y0, x1, y1, ...]: the six players, then the ball (engine pixels) */
-export const POSITION_SLOTS = 14;
 /** how fast a network correction fades out (seconds) */
 const CORRECTION_FADE_S = 0.12;
 /** a jump bigger than this (a kickoff, say) is shown as is, not smoothed */
 const CORRECTION_MAX_PX = 140;
 
-/** Where every player and the ball are, in the layout `POSITION_SLOTS` describes. */
-export function readPositions(s: StreetState, out: Float32Array<ArrayBuffer> = new Float32Array(POSITION_SLOTS)): Float32Array<ArrayBuffer> {
-  s.players.forEach((p, i) => {
-    out[i * 2] = p.x;
-    out[i * 2 + 1] = p.y;
-  });
-  out[12] = s.ball.x;
-  out[13] = s.ball.y;
-  return out;
-}
 const toZ = (y: number) => (y - COURT.h / 2) * K;
 
 function canvasTexture(w: number, h: number, draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -224,197 +218,23 @@ function ballTexture(): THREE.CanvasTexture {
   });
 }
 
-function numberTexture(n: number, color: string): THREE.CanvasTexture {
-  return canvasTexture(64, 64, (ctx) => {
-    ctx.clearRect(0, 0, 64, 64);
-    ctx.font = '900 50px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineWidth = 6;
-    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.strokeText(String(n), 32, 35);
-    ctx.fillStyle = color;
-    ctx.fillText(String(n), 32, 35);
-  });
-}
-
-// ---------------------------------------------------------------- players
-
-const SKINS = ['#f1c7a3', '#e0ab82', '#c48d63', '#9c6b46', '#6f4a31'];
-const HAIRS = ['#16110e', '#33210f', '#5c3b1e', '#b08a3c', '#2a2a2e'];
-const BOOTS = ['#f2f2f2', '#17181c', '#ff5a36', '#35d0ff', '#e8ff3a', '#17181c'];
-const SHIRT_NUMBERS = [4, 10, 7, 5, 9, 11];
-
-/** A jointed human figure of about 1.8 m: hips, knees, shoulders and elbows
- * are groups that the animation code rotates. */
-interface PlayerRig {
-  root: THREE.Group;
-  body: THREE.Group;
-  legL: THREE.Group;
-  legR: THREE.Group;
-  kneeL: THREE.Group;
-  kneeR: THREE.Group;
-  armL: THREE.Group;
-  armR: THREE.Group;
-  elbowL: THREE.Group;
-  elbowR: THREE.Group;
-  crackRing: THREE.Mesh;
-  phase: number;
-  angle: number;
-  kickT: number;
-  prevPickupCd: number;
-  down: number;
-}
-
-function buildPlayer(index: number, look: TeamLook3d): PlayerRig {
-  const rand = seeded(31 + index * 17);
-  const skin = new THREE.MeshLambertMaterial({ color: SKINS[Math.floor(rand() * SKINS.length)] });
-  const hair = new THREE.MeshLambertMaterial({ color: HAIRS[Math.floor(rand() * HAIRS.length)] });
-  const jersey = new THREE.MeshLambertMaterial({ color: look.primary });
-  const trim = new THREE.MeshLambertMaterial({ color: look.secondary });
-  const shortsMat = new THREE.MeshLambertMaterial({ color: '#1d1f26' });
-  const boot = new THREE.MeshLambertMaterial({ color: BOOTS[index] });
-  const height = 0.95 + rand() * 0.1;
-  const build = 0.93 + rand() * 0.18;
-  const hairStyle = Math.floor(rand() * 4);
-
-  const root = new THREE.Group();
-  const body = new THREE.Group();
-  body.scale.set(build * PLAYER_SCALE, height * PLAYER_SCALE, build * PLAYER_SCALE);
-  root.add(body);
-
-  /** a capsule hanging down from its parent's origin */
-  const part = (parent: THREE.Object3D, radius: number, length: number, mat: THREE.Material, y = 0) => {
-    const m = new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 4, 10), mat);
-    m.position.y = y - length / 2;
-    m.castShadow = true;
-    parent.add(m);
-    return m;
-  };
-
-  const makeLeg = (side: number) => {
-    const hip = new THREE.Group();
-    hip.position.set(side * 0.1, 0.94, 0);
-    part(hip, 0.078, 0.34, skin, -0.04);
-    part(hip, 0.092, 0.16, shortsMat, 0.02); // the leg of the shorts
-    const knee = new THREE.Group();
-    knee.position.y = -0.45;
-    hip.add(knee);
-    part(knee, 0.058, 0.3, skin, -0.02);
-    part(knee, 0.062, 0.2, trim, -0.14); // sock
-    const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.105, 0.085, 0.27), boot);
-    shoe.position.set(0, -0.445, 0.065);
-    shoe.castShadow = true;
-    knee.add(shoe);
-    body.add(hip);
-    return { hip, knee };
-  };
-  const left = makeLeg(-1);
-  const right = makeLeg(1);
-
-  const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.2, 0.21), shortsMat);
-  pelvis.position.y = 0.97;
-  pelvis.castShadow = true;
-  body.add(pelvis);
-
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.165, 0.32, 5, 12), jersey);
-  torso.position.y = 1.27;
-  torso.scale.set(1.14, 1, 0.74);
-  torso.castShadow = true;
-  body.add(torso);
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.39, 0.035, 0.26), trim);
-  stripe.position.y = 1.09;
-  body.add(stripe);
-
-  const numberMat = new THREE.MeshBasicMaterial({ map: numberTexture(SHIRT_NUMBERS[index], look.secondary), transparent: true });
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), numberMat);
-  back.position.set(0, 1.3, -0.128);
-  back.rotation.y = Math.PI;
-  body.add(back);
-
-  const makeArm = (side: number) => {
-    const shoulder = new THREE.Group();
-    shoulder.position.set(side * 0.235, 1.47, 0);
-    part(shoulder, 0.05, 0.2, skin, -0.04);
-    part(shoulder, 0.062, 0.1, jersey, 0.02); // short sleeve
-    const elbow = new THREE.Group();
-    elbow.position.y = -0.29;
-    shoulder.add(elbow);
-    part(elbow, 0.041, 0.2, skin, -0.02);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.046, 8, 6), skin);
-    hand.position.y = -0.29;
-    hand.castShadow = true;
-    elbow.add(hand);
-    body.add(shoulder);
-    return { shoulder, elbow };
-  };
-  const armLeft = makeArm(-1);
-  const armRight = makeArm(1);
-
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.055, 0.1, 10), skin);
-  neck.position.y = 1.57;
-  body.add(neck);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.112, 18, 14), skin);
-  head.position.y = 1.7;
-  head.scale.set(0.95, 1.16, 1.02);
-  head.castShadow = true;
-  body.add(head);
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.018, 6, 5), skin);
-  nose.position.set(0, 1.69, 0.115);
-  body.add(nose);
-
-  // hair: short crop, longer on top, tied back, or shaved
-  if (hairStyle < 3) {
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.118, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.56), hair);
-    cap.position.set(0, 1.715, -0.012);
-    cap.scale.set(0.97, hairStyle === 1 ? 1.3 : 1.16, 1.05);
-    cap.castShadow = true;
-    body.add(cap);
-    if (hairStyle === 2) {
-      const tail = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.12, 3, 8), hair);
-      tail.position.set(0, 1.7, -0.14);
-      tail.rotation.x = 0.7;
-      body.add(tail);
-    }
-  }
-
-  const crackRing = new THREE.Mesh(
-    new THREE.RingGeometry(0.42, 0.6, 28),
-    new THREE.MeshBasicMaterial({ color: '#ffd64a', transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide })
-  );
-  crackRing.rotation.x = -Math.PI / 2;
-  crackRing.position.y = 0.03;
-  crackRing.visible = false;
-  root.add(crackRing);
-
-  return {
-    root,
-    body,
-    legL: left.hip,
-    legR: right.hip,
-    kneeL: left.knee,
-    kneeR: right.knee,
-    armL: armLeft.shoulder,
-    armR: armRight.shoulder,
-    elbowL: armLeft.elbow,
-    elbowR: armRight.elbow,
-    crackRing,
-    phase: rand() * 6,
-    angle: 0,
-    kickT: 0,
-    prevPickupCd: 0,
-    down: 0,
-  };
-}
-
 // ---------------------------------------------------------------- scene
 
 export class StreetScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(38, 16 / 9, 0.1, 200);
-  private rigs: PlayerRig[] = [];
+  /** el personaje de cada jugador (armado por código o del .glb) */
+  private chars: StreetCharacter[] = [];
+  /** el soporte de cada jugador: dónde está en la cancha y hacia dónde mira. El personaje se anima adentro. */
+  private holders: THREE.Group[] = [];
+  private crackRings: THREE.Mesh[] = [];
+  /** fase del paso de cada jugador (para el toque de la pelota al llevarla) */
+  private stride = new Float32Array(6);
+  private prevSpeed = new Float32Array(6);
+  private down = new Float32Array(6);
+  private brakeLeft = new Float32Array(6);
+  private facing = new THREE.Quaternion();
   private ball: THREE.Mesh;
   private ballShadow: THREE.Mesh;
   private ballHeight = 0;
@@ -438,20 +258,37 @@ export class StreetScene {
   private pixelRatio = Math.min(window.devicePixelRatio, 1.75);
   private slowFrames = 0;
   private size = { w: 0, h: 0 };
+  /** qué hace cada jugador en la intro (null fuera de la intro larga) */
+  private introPoses: Array<IntroPose | null> = [null, null, null, null, null, null];
+  // poses de cámara: la de juego de este cuadro, la de la intro, la mezcla y la última dibujada
+  private playPose = newPose();
+  private introPose = newPose();
+  private mixPose = newPose();
+  private lastPose = newPose();
+  private settleFrom = newPose();
+  private settleLeftMs = 0;
+  private wasMatchIntro = false;
+  private introT = 0;
+  /** etiqueta con número y apodo sobre el jugador que manejás */
+  private nameTag: HTMLDivElement | null = null;
+  /** en el menú principal la escena es solo un fondo: cámara lenta y sin interfaz de partido */
+  private backdrop = false;
 
   constructor(
     canvas: HTMLCanvasElement,
     private overlay: HTMLDivElement,
-    private looks: readonly [TeamLook3d, TeamLook3d],
+    private teams: readonly [StreetTeam, StreetTeam],
     /** whose marker and camera this screen shows: 0, or 1 for the guest of an online match */
-    private viewTeam: 0 | 1 = 0
+    private viewTeam: 0 | 1 = 0,
+    /** el modelo .glb cargado, o null para usar el jugador armado por código */
+    library: CharacterLibrary | null = null
   ) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     const sky = skyTexture();
     this.scene.background = sky;
@@ -483,10 +320,26 @@ export class StreetScene {
 
     const blob = blobTexture();
     this.disposables.push(blob);
+    const ringGeometry = new THREE.RingGeometry(0.42, 0.6, 28);
+    this.disposables.push(ringGeometry);
     for (let i = 0; i < 6; i++) {
-      const rig = buildPlayer(i, looks[i < 3 ? 0 : 1]);
-      this.rigs.push(rig);
-      this.scene.add(rig.root);
+      const team = teams[i < 3 ? 0 : 1];
+      const holder = new THREE.Group();
+      const char = createCharacter(team.players[i % 3], team, library);
+      holder.add(char.object);
+      // anillo dorado del Modo Crack, en el piso
+      const ring = new THREE.Mesh(
+        ringGeometry,
+        new THREE.MeshBasicMaterial({ color: '#ffd64a', transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.03;
+      ring.visible = false;
+      holder.add(ring);
+      this.chars.push(char);
+      this.holders.push(holder);
+      this.crackRings.push(ring);
+      this.scene.add(holder);
     }
 
     const ballMap = ballTexture();
@@ -520,6 +373,26 @@ export class StreetScene {
 
     this.camera.position.set(0, 12, 17);
     this.camera.lookAt(0, 0.8, 0);
+
+    this.nameTag = document.createElement('div');
+    this.nameTag.style.cssText = [
+      'position:absolute',
+      'transform:translate(-50%,-100%)',
+      'white-space:nowrap',
+      'padding:2px 9px',
+      'font:800 12px Manrope, system-ui, sans-serif',
+      'letter-spacing:0.5px',
+      'color:#fff',
+      'background:rgba(10,12,16,0.78)',
+      'border-bottom:2px solid #ffe14a',
+      'display:none',
+    ].join(';');
+    overlay.appendChild(this.nameTag);
+  }
+
+  /** Modo fondo del menú: la cámara se mece despacio alrededor de la cancha. */
+  setBackdrop(on: boolean) {
+    this.backdrop = on;
   }
 
   private buildCourt() {
@@ -769,6 +642,7 @@ export class StreetScene {
     if (goalJustScored) this.addShake(0.7);
     this.prevPhase = s.phase;
 
+    this.applyIntro(s);
     s.players.forEach((p, i) => this.animatePlayer(s, p, i, dt));
     this.animateBall(s, dt);
     this.animateCrowd(s);
@@ -776,109 +650,72 @@ export class StreetScene {
     this.updateCamera(s, dt);
     this.renderer.render(this.scene, this.camera);
     this.updatePopups(s);
+    this.updateNameTag(s);
+  }
+
+  /** En la intro larga los jugadores no están donde dice el motor: entran trotando, saludan y vuelven a su lugar. */
+  private applyIntro(s: StreetState) {
+    const matchIntro = s.phase === 'intro' && s.introKind === 'match';
+    const elapsed = introElapsed(s);
+    s.players.forEach((p, i) => {
+      if (!matchIntro) {
+        this.introPoses[i] = null;
+        return;
+      }
+      const home: [number, number] = [this.shown[i * 2], this.shown[i * 2 + 1]];
+      const pose = introPlayerPose(p.team, p.role, i % 3, elapsed, home);
+      this.shown[i * 2] = pose.x;
+      this.shown[i * 2 + 1] = pose.y;
+      this.introPoses[i] = pose;
+    });
   }
 
   private animatePlayer(s: StreetState, p: StreetPlayer, i: number, dt: number) {
-    const rig = this.rigs[i];
-    rig.root.position.set(toX(this.shown[i * 2]), 0, toZ(this.shown[i * 2 + 1]));
+    const holder = this.holders[i];
+    const ip = this.introPoses[i];
+    const custom = this.teams[p.team].players[i % 3];
+    holder.position.set(toX(this.shown[i * 2]), 0, toZ(this.shown[i * 2 + 1]));
 
-    // turn towards where the player is facing, the short way round
-    const target = Math.atan2(p.fx, p.fy);
-    let diff = target - rig.angle;
-    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
-    rig.angle += diff * Math.min(1, 12 * dt);
+    // hacia dónde mira: gira suave (slerp) hacia donde se mueve
+    const yaw = ip ? Math.atan2(ip.dx, ip.dy) : Math.atan2(p.fx, p.fy);
+    this.facing.setFromAxisAngle(UP, yaw);
+    const turning = holder.quaternion.angleTo(this.facing);
+    holder.quaternion.slerp(this.facing, 1 - Math.exp(-12 * dt));
 
-    const speed = Math.hypot(p.vx, p.vy) * K;
-    const effort = Math.min(1, speed / 4.5);
-    rig.phase += speed * dt * 2.1 + dt * 0.9;
-    const stride = Math.sin(rig.phase);
-
-    // a kick shows as the engine's short "can't pick the ball up" window starting
-    if (p.pickupCd > rig.prevPickupCd + 100 && p.tackleLockMs <= 0) rig.kickT = 1;
-    rig.prevPickupCd = p.pickupCd;
-    rig.kickT = Math.max(0, rig.kickT - dt * 3.2);
-    const kick = Math.sin(rig.kickT * Math.PI);
+    const speed = ip ? ip.speed : Math.hypot(p.vx, p.vy) * K;
+    this.stride[i] += speed * dt * 2.1 + dt * 0.9;
+    // frenada: la velocidad cae de golpe; la pose se sostiene un instante para que se vea
+    const decel = (this.prevSpeed[i] - speed) / Math.max(dt, 1e-3);
+    this.prevSpeed[i] = speed;
+    if (decel > 14 && speed < 2.5) this.brakeLeft[i] = 0.22;
+    this.brakeLeft[i] = Math.max(0, this.brakeLeft[i] - dt);
+    this.down[i] += ((p.stunMs > 0 ? 1 : 0) - this.down[i]) * Math.min(1, 10 * dt);
 
     const celebrating = s.phase === 'goal' && s.lastScorer === p.team;
-    const sulking = s.phase === 'goal' && s.lastScorer !== p.team;
-    rig.down += ((p.stunMs > 0 ? 1 : 0) - rig.down) * Math.min(1, 10 * dt);
+    const kick = p.kick
+      ? { kind: p.kick.kind, t: p.kick.ms / 1000, contact: p.kick.contactMs / 1000, follow: STREET.kick.followMs / 1000 }
+      : null;
+    const motion: MotionState = {
+      speed,
+      brake: this.brakeLeft[i] > 0 && !kick,
+      turn: turning > 1.2 && speed > 1.5,
+      kick,
+      trick: p.trickMs > 0 ? 1 - p.trickMs / (p.trickKind === 'cola' ? STREET.cola.ms : STREET.trickMs) : null,
+      trickKind: p.trickKind ?? 'gambeta',
+      slide: p.slideMs > 0 ? 1 - p.slideMs / (STREET.slide.moveMs + STREET.slide.getUpMs) : null,
+      down: this.down[i],
+      celebrate: celebrating ? custom.celebration : null,
+      sulk: s.phase === 'goal' && !celebrating,
+      // saludo de la intro: cada jugador hace el gesto de entrada que eligió
+      greet: ip && ip.gesture !== 'none' ? custom.entry : null,
+    };
+    this.chars[i].update(dt, motion, this.time, i);
 
-    // running: hips swing opposite each other, the trailing knee folds up, arms pump with bent elbows.
-    // Standing: weight on both feet, arms loose, a slow breath.
-    const breath = Math.sin(this.time * 1.8 + i) * 0.02 * (1 - effort);
-    let hipL = stride * 0.85 * effort;
-    let hipR = -stride * 0.85 * effort;
-    let kneeL = (0.18 + Math.max(0, Math.sin(rig.phase - 1.9)) * 1.35) * effort + 0.05;
-    let kneeR = (0.18 + Math.max(0, Math.sin(rig.phase - 1.9 + Math.PI)) * 1.35) * effort + 0.05;
-    let shoulderL = -stride * 0.8 * effort;
-    let shoulderR = stride * 0.8 * effort;
-    let elbowL = -(0.22 + effort * 1.15);
-    let elbowR = -(0.22 + effort * 1.15);
-    let spreadL = -0.09 - breath;
-    let spreadR = 0.09 + breath;
-    let lean = effort * 0.22;
-    let lift = Math.abs(Math.cos(rig.phase)) * 0.045 * effort + breath * 0.4;
-    let spin = 0;
-
-    if (kick > 0) {
-      // plant the left foot, swing the right leg through, opposite arm out for balance
-      hipR = hipR * (1 - kick) - kick * 1.35;
-      kneeR = kneeR * (1 - kick) + (rig.kickT > 0.5 ? 0.9 : 0.1) * kick;
-      hipL = hipL * (1 - kick) + kick * 0.25;
-      shoulderL -= kick * 0.9;
-      spreadL -= kick * 0.5;
-      lean -= kick * 0.16;
-    }
-    if (p.trickMs > 0) {
-      // gambeta: a quick turn over the ball with the arms out
-      const t = 1 - p.trickMs / STREET.trickMs;
-      spin = t * Math.PI * 2;
-      lift += Math.sin(t * Math.PI) * 0.14;
-      spreadL = -1.0;
-      spreadR = 1.0;
-      elbowL = elbowR = -0.4;
-    }
-    if (celebrating) {
-      lift = Math.abs(Math.sin(this.time * 7 + i)) * 0.4;
-      spreadL = -2.75;
-      spreadR = 2.75;
-      shoulderL = shoulderR = 0;
-      elbowL = elbowR = -0.25;
-      hipL = hipR = 0;
-      kneeL = kneeR = 0.25 * Math.abs(Math.cos(this.time * 7 + i));
-      lean = -0.08;
-    } else if (sulking) {
-      lean = 0.22;
-      shoulderL = shoulderR = 0.1;
-      elbowL = elbowR = -0.1;
-    }
-    if (rig.down > 0.5) {
-      // on the floor after a caño, kicking the air
-      hipL = -1.0 + Math.sin(this.time * 9) * 0.25;
-      hipR = -0.7 - Math.sin(this.time * 9) * 0.25;
-      kneeL = kneeR = 0.9;
-      spreadL = -1.2;
-      spreadR = 1.2;
-    }
-
-    rig.legL.rotation.x = hipL;
-    rig.legR.rotation.x = hipR;
-    rig.kneeL.rotation.x = kneeL;
-    rig.kneeR.rotation.x = kneeR;
-    rig.armL.rotation.set(shoulderL, 0, spreadL);
-    rig.armR.rotation.set(shoulderR, 0, spreadR);
-    rig.elbowL.rotation.x = elbowL;
-    rig.elbowR.rotation.x = elbowR;
-
-    rig.root.rotation.y = rig.angle + spin;
-    rig.body.rotation.x = lean * (1 - rig.down) - (Math.PI / 2) * rig.down;
-    rig.body.position.y = lift * (1 - rig.down) + 0.17 * rig.down;
-
-    const crack = s.crackMs[p.team] > 0;
-    rig.crackRing.visible = crack;
-    if (crack) {
+    const ring = this.crackRings[i];
+    ring.visible = s.crackMs[p.team] > 0;
+    if (ring.visible) {
       const pulse = 1 + Math.sin(this.time * 9) * 0.12;
-      rig.crackRing.scale.set(pulse, pulse, 1);
+      ring.scale.set(pulse, pulse, 1);
     }
   }
 
@@ -905,10 +742,10 @@ export class StreetScene {
 
     let x = toX(this.shown[12]);
     let z = toZ(this.shown[13]);
-    if (!free) {
+    if (!free && s.phase !== 'intro') {
       // dribbling touch: the ball rolls a little ahead and back with each stride
       const h = s.players[s.holder];
-      const push = Math.max(0, Math.sin(this.rigs[s.holder].phase * 2)) * 0.22 * Math.min(1, speed / 4);
+      const push = Math.max(0, Math.sin(this.stride[s.holder] * 2)) * 0.22 * Math.min(1, speed / 4);
       x += h.fx * push;
       z += h.fy * push;
     }
@@ -922,7 +759,8 @@ export class StreetScene {
   }
 
   private animateCrowd(s: StreetState) {
-    const excited = s.phase === 'goal';
+    // el público se prende en el gol y cuando empieza la cuenta regresiva
+    const excited = s.phase === 'goal' || (s.phase === 'intro' && s.introKind === 'match' && introElapsed(s) >= STREET.intro.countdown.startMs);
     for (let i = 0; i < this.crowdBase.length; i++) {
       const p = this.crowdBase[i];
       const bounce = excited ? Math.abs(Math.sin(this.time * 8 + i * 1.7)) * 0.45 : Math.sin(this.time * 1.6 + i) * 0.03;
@@ -935,9 +773,27 @@ export class StreetScene {
     this.crowd.instanceMatrix.needsUpdate = true;
   }
 
+  /** Pone el apodo sobre el jugador activo (se oculta en la intro larga y al terminar). */
+  private updateNameTag(s: StreetState) {
+    const tag = this.nameTag;
+    if (!tag) return;
+    const index = s.controlled[this.viewTeam];
+    if (this.backdrop || index < 0 || s.phase === 'ended' || (s.phase === 'intro' && s.introKind === 'match')) {
+      tag.style.display = 'none';
+      return;
+    }
+    const custom = this.teams[this.viewTeam].players[index % 3];
+    const text = `${custom.number}  ${custom.nickname}`;
+    if (tag.textContent !== text) tag.textContent = text;
+    const v = new THREE.Vector3(toX(this.shown[index * 2]), 3.08, toZ(this.shown[index * 2 + 1])).project(this.camera);
+    tag.style.display = '';
+    tag.style.left = `${(v.x * 0.5 + 0.5) * 100}%`;
+    tag.style.top = `${(-v.y * 0.5 + 0.5) * 100}%`;
+  }
+
   private updateMarker(s: StreetState) {
     const p = s.players[s.controlled[this.viewTeam]];
-    this.marker.visible = !!p && s.phase !== 'ended';
+    this.marker.visible = !this.backdrop && !!p && s.phase !== 'ended' && !(s.phase === 'intro' && s.introKind === 'match');
     if (!p) return;
     const index = s.controlled[this.viewTeam];
     this.marker.position.set(toX(this.shown[index * 2]), 0, toZ(this.shown[index * 2 + 1]));
@@ -946,6 +802,17 @@ export class StreetScene {
   }
 
   private updateCamera(s: StreetState, dt: number) {
+    if (this.backdrop) {
+      // vaivén lento de unos ±40 grados alrededor de la cancha
+      const a = Math.sin(this.time * 0.12) * 0.7;
+      this.camera.position.set(Math.sin(a) * 21, 7.4 + Math.sin(this.time * 0.2) * 0.9, Math.cos(a) * 17);
+      this.camera.lookAt(0, 1.3, -1);
+      if (this.camera.fov !== 40) {
+        this.camera.fov = 40;
+        this.camera.updateProjectionMatrix();
+      }
+      return;
+    }
     const bx = toX(this.shown[12]);
     const bz = toZ(this.shown[13]);
     const index = s.controlled[this.viewTeam];
@@ -976,11 +843,38 @@ export class StreetScene {
     const jx = (Math.random() - 0.5) * this.shake * 0.9;
     const jy = (Math.random() - 0.5) * this.shake * 0.7;
 
-    this.camera.position.set(camX + jx, camY + jy, camZ);
-    this.camera.lookAt(this.focus.x * 0.86, 1.4, this.focus.z * 0.5 - 2.2);
-    const fov = 38 - this.shake * 3;
-    if (Math.abs(this.camera.fov - fov) > 0.01) {
-      this.camera.fov = fov;
+    // la cámara de juego de este cuadro
+    this.playPose.position.set(camX + jx, camY + jy, camZ);
+    this.playPose.look.set(this.focus.x * 0.86, 1.4, this.focus.z * 0.5 - 2.2);
+    this.playPose.fov = 38 - this.shake * 3;
+    let pose = this.playPose;
+
+    const matchIntro = s.phase === 'intro' && s.introKind === 'match';
+    if (matchIntro) {
+      // recorrido cinematográfico: edificios, público, bajada a la cancha, y se funde con la cámara de juego
+      this.introT = Math.max(0, Math.min(1, introElapsed(s) / s.introTotalMs));
+      pose = introCameraAt(this.introT, this.playPose, this.introPose);
+    } else if (this.wasMatchIntro && this.introT < 0.97) {
+      // se saltó la intro: la cámara se acomoda a la de juego en vez de pegar un salto
+      this.settleLeftMs = STREET.intro.skipSettleMs;
+      this.settleFrom.position.copy(this.lastPose.position);
+      this.settleFrom.look.copy(this.lastPose.look);
+      this.settleFrom.fov = this.lastPose.fov;
+    }
+    this.wasMatchIntro = matchIntro;
+    if (!matchIntro && this.settleLeftMs > 0) {
+      this.settleLeftMs = Math.max(0, this.settleLeftMs - dt * 1000);
+      const w = smoothstep(1 - this.settleLeftMs / STREET.intro.skipSettleMs);
+      pose = blendCamera(this.settleFrom, this.playPose, w, this.mixPose);
+    }
+
+    this.camera.position.copy(pose.position);
+    this.camera.lookAt(pose.look);
+    this.lastPose.position.copy(pose.position);
+    this.lastPose.look.copy(pose.look);
+    this.lastPose.fov = pose.fov;
+    if (Math.abs(this.camera.fov - pose.fov) > 0.01) {
+      this.camera.fov = pose.fov;
       this.camera.updateProjectionMatrix();
     }
   }
@@ -1015,7 +909,7 @@ export class StreetScene {
           'font-style:italic',
           'letter-spacing:1px',
           `font-size:${big ? 'clamp(26px, 5vw, 54px)' : 'clamp(16px, 2.6vw, 30px)'}`,
-          `color:${big ? '#ffd64a' : this.looks[q.team].primary}`,
+          `color:${big ? '#ffd64a' : this.teams[q.team].primary}`,
           '-webkit-text-stroke:1.5px rgba(0,0,0,0.9)',
           'text-shadow:0 3px 0 rgba(0,0,0,0.75), 0 0 16px rgba(0,0,0,0.6)',
           'animation:street-popup 1.1s ease-out forwards',
@@ -1036,6 +930,11 @@ export class StreetScene {
   }
 
   dispose() {
+    // los personajes liberan lo suyo (un .glb comparte geometría con la plantilla: no se toca)
+    for (const holder of this.holders) this.scene.remove(holder);
+    for (const char of this.chars) char.dispose();
+    for (const ring of this.crackRings) (ring.material as THREE.Material).dispose();
+    this.nameTag?.remove();
     for (const node of this.popupNodes.values()) node.remove();
     this.popupNodes.clear();
     this.scene.traverse((obj) => {

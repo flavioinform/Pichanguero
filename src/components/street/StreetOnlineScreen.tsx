@@ -1,18 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { colors, fonts } from '../../theme';
 import { useAuth } from '../../hooks/useAuth';
 import { useStreetSession } from '../../hooks/useStreetSession';
 import { createStreetSession, joinStreetSession, startStreetMatch } from '../../lib/streetSession';
-import { fetchCountries, type CountryOption } from '../../lib/careerData';
-import { CountryPickStep } from '../headsoccer/CountryPickStep';
+import { defaultTeam, distinctPair, teamFromJson, teamToJson, type StreetTeam } from '../../lib/street/team';
 import { StreetGame } from './StreetGame';
 
 interface StreetOnlineScreenProps {
+  /** tu equipo guardado: es el que juega online */
+  team: StreetTeam;
   onBack: () => void;
 }
 
-type View = 'pick-country' | 'choose' | 'join';
+type View = 'choose' | 'join';
 
 /** Supabase's answer when the rooms table was never created (migration 0022 not run). */
 function friendlyError(err: unknown, fallback: string): string {
@@ -23,46 +24,24 @@ function friendlyError(err: unknown, fallback: string): string {
   return message || fallback;
 }
 
-export function StreetOnlineScreen({ onBack }: StreetOnlineScreenProps) {
+export function StreetOnlineScreen({ team, onBack }: StreetOnlineScreenProps) {
   const { userId, loading: authLoading } = useAuth();
-  const [view, setView] = useState<View>('pick-country');
-  const [countries, setCountries] = useState<CountryOption[]>([]);
-  const [myCountry, setMyCountry] = useState<CountryOption | null>(null);
+  const [view, setView] = useState<View>('choose');
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchCountries()
-      .then(setCountries)
-      .catch(() => setCountries([]));
-  }, []);
-
   const { session, loading: sessionLoading, takeRemoteInput, sendInput, sendSnapshot, takeSnapshot, connected } = useStreetSession(sessionId);
 
   if (authLoading) return <CenteredMessage text="Conectando…" />;
 
-  if (view === 'pick-country' && !myCountry) {
-    return (
-      <CountryPickStep
-        title="Elegí tu país"
-        countries={countries}
-        onChoose={(c) => {
-          setMyCountry(c);
-          setView('choose');
-        }}
-        onBack={onBack}
-      />
-    );
-  }
-
   async function handleCreate() {
-    if (!myCountry) return;
     setBusy(true);
     setErrorMsg(null);
     try {
-      const created = await createStreetSession(myCountry.name);
+      // el equipo entero viaja en la columna de texto de la sala (el rival lo lee de ahí)
+      const created = await createStreetSession(teamToJson(team));
       setSessionId(created.id);
     } catch (err) {
       setErrorMsg(friendlyError(err, 'No se pudo crear la sala.'));
@@ -72,11 +51,11 @@ export function StreetOnlineScreen({ onBack }: StreetOnlineScreenProps) {
   }
 
   async function handleJoin() {
-    if (!myCountry || !joinCodeInput.trim()) return;
+    if (!joinCodeInput.trim()) return;
     setBusy(true);
     setErrorMsg(null);
     try {
-      const joined = await joinStreetSession(joinCodeInput.trim(), myCountry.name);
+      const joined = await joinStreetSession(joinCodeInput.trim(), teamToJson(team));
       setSessionId(joined.id);
     } catch (err) {
       setErrorMsg(friendlyError(err, 'No se pudo unir a la sala.'));
@@ -109,8 +88,7 @@ export function StreetOnlineScreen({ onBack }: StreetOnlineScreenProps) {
       return (
         <StreetGame
           difficulty="normal"
-          p1CountryName={session.host_country}
-          p2CountryName={session.guest_country ?? 'Desconocido'}
+          teams={distinctPair(teamFromJson(session.host_country) ?? defaultTeam(), teamFromJson(session.guest_country) ?? defaultTeam())}
           onBack={onBack}
           online={{ isHost, takeRemoteInput, sendInput, sendSnapshot, takeSnapshot, connected }}
         />
@@ -178,7 +156,7 @@ export function StreetOnlineScreen({ onBack }: StreetOnlineScreenProps) {
     <CenteredCard>
       <Title>Fútbol callejero online</Title>
       <p style={{ color: colors.textSecondary, fontSize: 14, textAlign: 'center', maxWidth: 420, margin: 0 }}>
-        Creá una sala y compartí el código, o unite a la de un amigo. Cada uno maneja un equipo de tres, con dos compañeros de la CPU. Jugás con {myCountry?.name}.
+        Creá una sala y compartí el código, o unite a la de un amigo. Cada uno maneja un equipo de tres, con dos compañeros de la CPU. Jugás con {team.name}.
       </p>
       {errorMsg && <ErrorText text={errorMsg} />}
       <PrimaryButton label={busy ? 'Creando…' : 'Crear sala'} disabled={busy} onClick={handleCreate} />

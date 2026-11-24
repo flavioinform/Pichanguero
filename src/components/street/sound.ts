@@ -110,6 +110,16 @@ export class StreetAudio {
     this.cheer(1, 2.6);
   }
 
+  /** pitido corto de la cuenta regresiva (el último, más agudo) */
+  countBeep(last: boolean) {
+    this.tone(last ? 1320 : 880, last ? 1300 : 870, 0.16, 0.22, 'square');
+  }
+
+  /** el público se agranda durante `seconds` */
+  swell(amount: number, seconds: number) {
+    this.cheer(amount, seconds);
+  }
+
   whistle() {
     this.tone(2100, 2050, 0.7, 0.16, 'square');
   }

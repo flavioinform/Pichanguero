@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MutableRefObject, PointerEvent as ReactPointerEvent } from 'react';
 import { colors } from '../../theme';
-import { jerseyColors } from '../../lib/countryVisuals';
+import type { StreetTeam } from '../../lib/street/team';
+import { loadSettings, updateSetting } from '../../lib/street/settings';
 import { STREET, STREET_ONLINE } from '../../config/gameConfig';
 import { useViewport } from '../../hooks/useViewport';
-import { COURT, TAP_KEYS, createStreetState, emptyStreetInput, stepStreet, withTaps } from '../../lib/street/engine';
+import { COURT, TAP_KEYS, createStreetState, emptyStreetInput, skipStreetIntro, stepStreet, withTaps } from '../../lib/street/engine';
 import type { Difficulty, StreetInput, StreetState, TapKey, Taps } from '../../lib/street/engine';
+import type { Stats } from '../../lib/street/team';
 import { ClockChip, GoalBanner, ScoreBar } from '../headsoccer/Hud';
 import { HeadSoccerResult } from '../headsoccer/HeadSoccerResult';
 import { drawStreet } from './render';
 import type { StreetScene } from './scene3d';
-import { POSITION_SLOTS, readPositions } from './scene3d';
+import { POSITION_SLOTS, readPositions } from '../../lib/street/positions';
 import { mergeStreetSnapshot, type StreetSnapshot } from '../../lib/street/netSync';
 import { StreetAudio } from './sound';
+import { IntroOverlay } from './IntroOverlay';
+import { introElapsed, introLabel, isGoLabel } from '../../lib/street/intro';
 
 const STEP_MS = 1000 / 60;
 const ASPECT = 16 / 9;
@@ -32,8 +36,8 @@ export interface StreetOnline {
 }
 
 interface StreetGameProps {
-  p1CountryName: string;
-  p2CountryName: string;
+  /** el equipo 0 (el tuyo, o el anfitrión online) y el equipo 1 */
+  teams: readonly [StreetTeam, StreetTeam];
   difficulty: Difficulty;
   onBack: () => void;
   online?: StreetOnline;
@@ -43,11 +47,16 @@ interface Hud {
   clockMs: number;
   score: [number, number];
   phase: StreetState['phase'];
+  introKind: StreetState['introKind'];
+  /** el cartel grande de la animación de inicio, o null */
+  introLabel: string | null;
   winner: StreetState['winner'];
   style: [number, number];
   crackMs: [number, number];
   /** 0-1, how loaded the shot is */
   charge: number;
+  /** 0-1, el aire para el sprint del jugador que manejás (redondeado para no redibujar de más) */
+  stamina: number;
 }
 
 const KEYS: Record<string, keyof StreetInput> = {
@@ -64,26 +73,21 @@ const KEYS: Record<string, keyof StreetInput> = {
   l: 'trick',
   q: 'switch',
   ' ': 'switch',
+  Shift: 'sprint',
 };
 
-const MANUAL_SWITCH_KEY = 'pichanguero.street.manualSwitch';
-
-function loadManualSwitch(): boolean {
-  try {
-    return localStorage.getItem(MANUAL_SWITCH_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, online }: StreetGameProps) {
+export function StreetGame({ teams, difficulty, onBack, online }: StreetGameProps) {
+  const p1Label = teams[0].abbr;
+  const p2Label = teams[1].abbr;
   const onlineRef = useRef(online);
   onlineRef.current = online;
   /** the team this screen plays */
   const myTeam: 0 | 1 = online && !online.isHost ? 1 : 0;
   const newMatch = useCallback(
     () => {
-      const state = createStreetState(difficulty, STREET.targetGoals, STREET.matchSeconds * 1000, online ? [true, true] : true);
+      // las estadísticas de cada jugador del equipo entran al motor
+      const skills: [Stats[], Stats[]] = [teams[0].players.map((p) => p.stats), teams[1].players.map((p) => p.stats)];
+      const state = createStreetState(difficulty, STREET.targetGoals, STREET.matchSeconds * 1000, online ? [true, true] : true, true, skills);
       // an online guest only predicts; the host's snapshots are the real match
       state.authoritative = !online || online.isHost;
       return state;
@@ -105,14 +109,18 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
   const tapsRef = useRef<Taps>({});
   const stateRef = useRef<StreetState>(null as unknown as StreetState);
   if (!stateRef.current) stateRef.current = newMatch();
-  const looksRef = useRef([jerseyColors(p1CountryName), jerseyColors(p2CountryName)] as const);
+  const looksRef = useRef(teams);
   const audioRef = useRef<StreetAudio | null>(null);
   const [hud, setHud] = useState<Hud>(() => snapshot(stateRef.current, myTeam));
   /** true when WebGL isn't available: the match is drawn flat, from above, instead */
   const [flat, setFlat] = useState(false);
-  const [muted, setMuted] = useState(false);
+  /** mientras se cargan la escena y los jugadores se muestra "Cargando jugadores…" */
+  const [loadingPlayers, setLoadingPlayers] = useState(true);
+  const [muted, setMuted] = useState(() => !loadSettings().sound);
+  /** la línea con las teclas, si no se apagó en Ajustes */
+  const [helpOn] = useState(() => loadSettings().controlsHelp);
   /** change player only with the switch key, never automatically */
-  const [manualSwitch, setManualSwitch] = useState(loadManualSwitch);
+  const [manualSwitch, setManualSwitch] = useState(() => loadSettings().manualSwitch);
   const manualSwitchRef = useRef(manualSwitch);
   manualSwitchRef.current = manualSwitch;
 
@@ -121,14 +129,28 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
     setHud(snapshot(stateRef.current, myTeam));
   }, [newMatch, myTeam]);
 
+  /** Salta la animación de inicio. Online solo puede el anfitrión: el invitado recibe la fase desde el anfitrión. */
+  const skipIntro = useCallback(() => {
+    const s = stateRef.current;
+    const net = onlineRef.current;
+    if (s.phase !== 'intro' || s.introKind !== 'match' || (net && !net.isHost)) return;
+    skipStreetIntro(s);
+  }, []);
+
   useEffect(() => {
     const audio = new StreetAudio();
     audioRef.current = audio;
     function onKey(e: KeyboardEvent, value: boolean) {
+      if (value && e.key === 'Enter') {
+        audio.unlock();
+        skipIntro();
+        return;
+      }
       const key = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
       if (!key) return;
       e.preventDefault();
       audio.unlock();
+      if (value && e.key === ' ') skipIntro();
       if (value && (TAP_KEYS as readonly string[]).includes(key)) tapsRef.current[key as TapKey] = true;
       inputRef.current = { ...inputRef.current, [key]: value };
     }
@@ -144,18 +166,15 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
       window.removeEventListener('pointerdown', unlock);
       audio.dispose();
     };
-  }, []);
+  }, [skipIntro]);
 
   useEffect(() => {
     audioRef.current?.setMuted(muted);
+    updateSetting('sound', !muted);
   }, [muted]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(MANUAL_SWITCH_KEY, manualSwitch ? '1' : '0');
-    } catch {
-      // storage unavailable: the choice just won't be remembered
-    }
+    updateSetting('manualSwitch', manualSwitch);
   }, [manualSwitch]);
 
   useEffect(() => {
@@ -168,14 +187,19 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
     let ready = false;
     let cancelled = false;
     const fit = () => scene?.resize(canvas.clientWidth, canvas.clientHeight);
-    import('./scene3d')
-      .then(({ StreetScene: Scene }) => {
+    // escena y jugadores se cargan antes de arrancar: la intro no empieza hasta que estén listos
+    Promise.all([import('./scene3d'), import('./characters/library').then((m) => m.loadCharacterLibrary())])
+      .then(([{ StreetScene: Scene }, library]) => {
         if (cancelled) return;
-        scene = new Scene(canvas, overlay, looksRef.current, myTeam);
+        scene = new Scene(canvas, overlay, looksRef.current, myTeam, library);
         fit();
+        setLoadingPlayers(false);
       })
       .catch(() => {
-        if (!cancelled) setFlat(true);
+        if (!cancelled) {
+          setFlat(true);
+          setLoadingPlayers(false);
+        }
       })
       .finally(() => {
         ready = true;
@@ -193,6 +217,7 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
     let prevVx = 0;
     let prevVy = 0;
     let prevPhase = stateRef.current.phase;
+    let prevLabel: string | null = null;
     const heard = new Set<number>();
     let tick = 0;
     let hostInput = emptyStreetInput();
@@ -258,11 +283,29 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
             // slowing one screen down would put the two players out of step
             if (!net) slowMoMs = SLOW_MO.ms;
           } else if (q.text.includes('CAÑO')) audio?.cano();
-          else if (q.text.includes('Gambeta')) audio?.trick();
+          else if (q.text.includes('Gambeta') || q.text.includes('Cola de vaca')) audio?.trick();
+          else if (q.text.includes('Barrida')) {
+            audio?.kick(0.55);
+            scene?.addShake(0.12);
+          } else if (q.text.includes('Falta')) audio?.whistle();
         }
         if (s.phase !== prevPhase) {
           if (s.phase === 'goal') audio?.goal();
           if (s.phase === 'ended') audio?.whistle();
+          // si se saltó la intro no hubo cuenta regresiva: igual suena el pitazo de salida
+          if (prevPhase === 'intro' && s.phase === 'playing' && !isGoLabel(prevLabel)) audio?.whistle();
+        }
+        // sonido de la cuenta regresiva: un pitido por número, el pitazo en la salida y el público que sube
+        const label = s.phase === 'intro' ? introLabel(s.introKind, introElapsed(s)) : null;
+        if (label !== prevLabel) {
+          if (label === '3') audio?.swell(0.45, 5);
+          if (label === '3' || label === '2') audio?.countBeep(false);
+          else if (label === '1') audio?.countBeep(true);
+          else if (isGoLabel(label)) {
+            audio?.whistle();
+            audio?.swell(0.9, 2.5);
+          }
+          prevLabel = label;
         }
         prevHolder = s.holder;
         prevVx = s.ball.vx;
@@ -286,6 +329,8 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
         Math.ceil(s.crackMs[0] / 500),
         Math.ceil(s.crackMs[1] / 500),
         Math.round(Math.min(1, s.chargeMs[myTeam] / STREET.charge.maxMs) * 20),
+        s.introKind,
+        s.phase === 'intro' ? introLabel(s.introKind, introElapsed(s)) : '',
       ].join('|');
       if (key !== lastHudKey) {
         lastHudKey = key;
@@ -345,6 +390,33 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
             />
           )}
           <div ref={overlayRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }} />
+          {loadingPlayers && (
+            <div
+              role="status"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'grid',
+                placeItems: 'center',
+                background: '#121317',
+                color: '#efece2',
+                fontFamily: "'Anton', Impact, sans-serif",
+                fontSize: 'clamp(22px, 3.2vw, 36px)',
+                letterSpacing: 2,
+                textTransform: 'uppercase',
+              }}
+            >
+              Cargando jugadores…
+            </div>
+          )}
+          <IntroOverlay
+            phase={hud.phase}
+            kind={hud.introKind}
+            label={hud.introLabel}
+            looks={looks}
+            canSkip={!online || online.isHost}
+            onSkip={skipIntro}
+          />
         </div>
         <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)' }}>
           <ClockChip label={clockLabel} />
@@ -355,6 +427,35 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
         <div style={{ position: 'absolute', top: 12, right: 28 }}>
           <StyleMeter value={hud.style[1]} crackMs={hud.crackMs[1]} color={looks[1].primary} align="right" />
         </div>
+        {hud.stamina < 1 && hud.phase === 'playing' && (
+          <div
+            aria-label="Aire para el sprint"
+            style={{ position: 'absolute', bottom: 18, left: 28, display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: 1, color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}>
+              AIRE
+            </span>
+            <div
+              style={{
+                width: 'min(110px, 20vw)',
+                height: 8,
+                borderRadius: 999,
+                background: 'rgba(0,0,0,0.65)',
+                border: '1px solid rgba(255,255,255,0.35)',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  width: `${hud.stamina * 100}%`,
+                  height: '100%',
+                  background: hud.stamina < 0.2 ? '#ff5d3a' : '#4fd1ff',
+                  transition: 'width 0.15s',
+                }}
+              />
+            </div>
+          </div>
+        )}
         {hud.charge > 0 && hud.phase === 'playing' && (
           <div
             style={{
@@ -422,10 +523,10 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
         </button>
         <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)' }}>
           <ScoreBar
-            p1Label={p1CountryName}
+            p1Label={p1Label}
             p1Color={looks[0].primary}
             scoreP1={hud.score[0]}
-            p2Label={p2CountryName}
+            p2Label={p2Label}
             p2Color={looks[1].primary}
             scoreP2={hud.score[1]}
           />
@@ -470,8 +571,8 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
         {hud.phase === 'ended' && hud.winner !== null && (
           <HeadSoccerResult
             winner={winner}
-            p1Label={p1CountryName}
-            p2Label={p2CountryName}
+            p1Label={teams[0].name}
+            p2Label={teams[1].name}
             scoreP1={hud.score[0]}
             scoreP2={hud.score[1]}
             onRematch={rematch}
@@ -481,9 +582,10 @@ export function StreetGame({ p1CountryName, p2CountryName, difficulty, onBack, o
         )}
       </div>
 
-      {!mobile && (
+      {!mobile && helpOn && (
         <div style={{ fontSize: 12, color: colors.textMuted, textAlign: 'center' }}>
-          Mover: flechas o WASD · Pase: J · Tiro: K (mantené para cargar) · Gambeta: L · Cambiar jugador: Q o Espacio · Gambeteá encima de un rival para hacerle un caño
+          Mover: flechas o WASD · Sprint: Shift · Pase: J · Tiro: K (mantené para cargar) · Barrida: K sin la pelota · Gambeta: L
+          (L hacia atrás: cola de vaca) · Cambiar jugador: Q o Espacio · Gambeteá encima de un rival para hacerle un caño
         </div>
       )}
 
@@ -558,10 +660,13 @@ function snapshot(s: StreetState, team: 0 | 1): Hud {
     clockMs: s.clockMs,
     score: [s.score[0], s.score[1]],
     phase: s.phase,
+    introKind: s.introKind,
+    introLabel: s.phase === 'intro' ? introLabel(s.introKind, introElapsed(s)) : null,
     winner: s.winner,
     style: [Math.round(s.style[0]), Math.round(s.style[1])],
     crackMs: [s.crackMs[0], s.crackMs[1]],
     charge: Math.min(1, s.chargeMs[team] / STREET.charge.maxMs),
+    stamina: s.controlled[team] >= 0 ? Math.round(s.players[s.controlled[team]].stamina * 20) / 20 : 1,
   };
 }
 
@@ -576,6 +681,7 @@ function mergeInputs(a: StreetInput, b: StreetInput, manualSwitch: boolean): Str
     trick: a.trick || b.trick,
     switch: a.switch || b.switch,
     manualSwitch,
+    sprint: a.sprint || b.sprint,
   };
 }
 
@@ -613,6 +719,7 @@ function TouchPad({ inputRef, tapsRef }: { inputRef: MutableRefObject<StreetInpu
         <PadButton size={size} label="Pase" small {...handlers('pass')} />
         <PadButton size={size} label="Gamb." small {...handlers('trick')} />
         <PadButton size={size} label="Cambio" small {...handlers('switch')} />
+        <PadButton size={size} label="Sprint" small {...handlers('sprint')} />
         <PadButton size={size + 10} label="Tiro" small {...handlers('shoot')} />
       </div>
     </div>
